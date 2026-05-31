@@ -1,0 +1,77 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+#
+# Lab Kolla-Ansible Multinode (2 VMs) - Stack de base avec Cinder
+# - vm1 : controller + network + compute + storage (Cinder LVM)
+# - vm2 : compute
+#
+# Réseaux :
+#   - eth0 : NAT (Internet, géré par Vagrant)
+#   - eth1 : Host-Only 192.168.56.0/24  (management/API)
+#            -> accessible depuis Windows (Horizon, SSH)
+#   - eth2 : Host-Only 192.168.57.0/24  (provider Neutron, sans IP côté guest)
+#            -> les instances OpenStack auront des IPs sur ce réseau
+#
+# Disques :
+#   - sda : disque système (par défaut bento, ~64 Go)
+#   - sdb : disque Cinder LVM 30 Go (vm1 uniquement)
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "bento/ubuntu-22.04"
+  config.vm.box_check_update = false
+
+  # Clés SSH partagées (générées par generate-ssh.sh/ps1)
+  config.vm.provision "file", source: "./ssh/id_rsa",     destination: "/home/vagrant/.ssh/id_rsa"
+  config.vm.provision "file", source: "./ssh/id_rsa.pub", destination: "/home/vagrant/.ssh/id_rsa.pub"
+
+  # Script de préparation commun
+  config.vm.provision "shell", path: "bootstrap.sh"
+
+  # =========================================================
+  #  VM1 : controller + network + compute + storage
+  # =========================================================
+  config.vm.define "vm1" do |vm1|
+    vm1.vm.hostname = "vm1"
+
+    # Management (host-only, accessible Windows)
+    vm1.vm.network "private_network", ip: "192.168.56.10"
+
+    # Provider Neutron (host-only, SANS IP côté guest)
+    vm1.vm.network "private_network",
+                   ip: "192.168.57.10",
+                   auto_config: false
+
+    vm1.vm.provider "virtualbox" do |vb|
+      vb.name   = "kolla-vm1"
+      vb.memory = 6144   # Augmenter à 7168 ou 8192 si possible (Cinder ajoute ~500 Mo)
+      vb.cpus   = 4
+      # Promiscuous mode "Allow All" sur l'adaptateur provider
+      vb.customize ["modifyvm", :id, "--nicpromisc3", "allow-all"]
+      vb.customize ["modifyvm", :id, "--nested-hw-virt", "on"]
+    end
+
+    # Disque dédié Cinder LVM (sera /dev/sdb dans la VM)
+    vm1.vm.disk :disk, size: "30GB", name: "vm1-cinder"
+  end
+
+  # =========================================================
+  #  VM2 : compute only
+  # =========================================================
+  config.vm.define "vm2" do |vm2|
+    vm2.vm.hostname = "vm2"
+
+    vm2.vm.network "private_network", ip: "192.168.56.11"
+    vm2.vm.network "private_network",
+                   ip: "192.168.57.11",
+                   auto_config: false
+
+    vm2.vm.provider "virtualbox" do |vb|
+      vb.name   = "kolla-vm2"
+      vb.memory = 6144
+      vb.cpus   = 2
+      vb.customize ["modifyvm", :id, "--nicpromisc3", "allow-all"]
+      vb.customize ["modifyvm", :id, "--nested-hw-virt", "on"]
+    end
+    # Pas de disque Cinder sur vm2 (compute uniquement)
+  end
+end
