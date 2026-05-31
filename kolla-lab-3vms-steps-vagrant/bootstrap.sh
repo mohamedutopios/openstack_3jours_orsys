@@ -1,8 +1,72 @@
 #!/bin/bash
-# Bootstrap automatique exécuté par Vagrant sur vm1, vm2, vm3
+# Bootstrap idempotent - détecte dynamiquement les interfaces
+# (compatible eth0/eth1/eth2 ET enp0s3/enp0s8/enp0s9)
 set -e
 
-echo "===> [$(hostname)] Mise à jour du système et paquets de base"
+echo "===> Détection des interfaces réseau"
+
+# Liste toutes les interfaces ethernet (hors lo), dans l'ordre
+INTERFACES=$(ls /sys/class/net/ | grep -E '^(eth|en)' | sort)
+echo "    Interfaces détectées : $INTERFACES"
+
+NAT_IF=$(echo "$INTERFACES" | sed -n '1p')
+MGMT_IF=$(echo "$INTERFACES" | sed -n '2p')
+PROVIDER_IF=$(echo "$INTERFACES" | sed -n '3p')
+
+if [ -z "$NAT_IF" ] || [ -z "$MGMT_IF" ] || [ -z "$PROVIDER_IF" ]; then
+  echo "!! Erreur : 3 interfaces attendues, trouvées : NAT=$NAT_IF MGMT=$MGMT_IF PROVIDER=$PROVIDER_IF"
+  exit 1
+fi
+
+echo "    NAT      : $NAT_IF"
+echo "    Mgmt     : $MGMT_IF"
+echo "    Provider : $PROVIDER_IF"
+
+# Mémorise les noms pour usage ultérieur
+echo "$MGMT_IF"     > /etc/kolla-mgmt-interface
+echo "$PROVIDER_IF" > /etc/kolla-provider-interface
+
+# Détecte le hostname cible via /tmp/vagrant_hostname (déposé par Vagrant)
+if [ -f /tmp/vagrant_hostname ]; then
+  TARGET_HOST=$(cat /tmp/vagrant_hostname)
+  hostnamectl set-hostname "$TARGET_HOST"
+else
+  TARGET_HOST=$(hostname)
+fi
+
+case "$TARGET_HOST" in
+  vm1) MGMT_IP="192.168.56.10" ;;
+  vm2) MGMT_IP="192.168.56.11" ;;
+  vm3) MGMT_IP="192.168.56.12" ;;
+  *)
+    echo "!! Hostname inconnu : $TARGET_HOST"
+    exit 1
+    ;;
+esac
+
+echo "===> Hostname: $TARGET_HOST, Mgmt IP: $MGMT_IP"
+
+echo "===> Reconfiguration netplan complète"
+rm -f /etc/netplan/*.yaml
+cat > /etc/netplan/01-kolla.yaml <<EOF
+network:
+  version: 2
+  ethernets:
+    $NAT_IF:
+      dhcp4: true
+    $MGMT_IF:
+      addresses: [$MGMT_IP/24]
+    $PROVIDER_IF:
+      dhcp4: false
+      dhcp6: false
+      optional: true
+      accept-ra: false
+EOF
+chmod 600 /etc/netplan/01-kolla.yaml
+netplan apply
+ip link set "$PROVIDER_IF" up
+
+echo "===> Paquets de base"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq \
@@ -11,7 +75,7 @@ apt-get install -y -qq \
   git curl jq net-tools \
   lvm2 thin-provisioning-tools
 
-echo "===> [$(hostname)] Configuration /etc/hosts"
+echo "===> /etc/hosts"
 sed -i '/vm1$/d; /vm2$/d; /vm3$/d' /etc/hosts
 cat >> /etc/hosts <<EOF
 192.168.56.10  vm1
@@ -19,51 +83,17 @@ cat >> /etc/hosts <<EOF
 192.168.56.12  vm3
 EOF
 
-echo "===> [$(hostname)] Activation de l'interface provider (eth2) sans IP"
-PROVIDER_IF=""
-for iface in enp0s9 eth2 ens9 enp0s10; do
-  if ip link show "$iface" >/dev/null 2>&1; then
-    PROVIDER_IF="$iface"
-    break
-  fi
-done
-
-if [ -z "$PROVIDER_IF" ]; then
-  echo "!! Interface provider introuvable. Vérifie avec 'ip a'."
-  exit 1
-fi
-
-echo "    -> Interface provider détectée : $PROVIDER_IF"
-ip link set "$PROVIDER_IF" up
-
-cat > /etc/netplan/99-provider.yaml <<EOF
-network:
-  version: 2
-  ethernets:
-    $PROVIDER_IF:
-      dhcp4: false
-      dhcp6: false
-      optional: true
-      accept-ra: false
-EOF
-chmod 600 /etc/netplan/99-provider.yaml
-netplan apply || true
-
-echo "$PROVIDER_IF" > /etc/kolla-provider-interface
-
-echo "===> [$(hostname)] Configuration SSH pour l'utilisateur vagrant"
+echo "===> SSH"
 mkdir -p /home/vagrant/.ssh
 chmod 700 /home/vagrant/.ssh
-chmod 600 /home/vagrant/.ssh/id_rsa
-chmod 644 /home/vagrant/.ssh/id_rsa.pub
-
-PUB_KEY=$(cat /home/vagrant/.ssh/id_rsa.pub)
-touch /home/vagrant/.ssh/authorized_keys
-if ! grep -qF "$PUB_KEY" /home/vagrant/.ssh/authorized_keys; then
-  echo "$PUB_KEY" >> /home/vagrant/.ssh/authorized_keys
+if [ -f /home/vagrant/.ssh/id_rsa ]; then
+  chmod 600 /home/vagrant/.ssh/id_rsa
+  chmod 644 /home/vagrant/.ssh/id_rsa.pub
+  PUB_KEY=$(cat /home/vagrant/.ssh/id_rsa.pub)
+  touch /home/vagrant/.ssh/authorized_keys
+  grep -qF "$PUB_KEY" /home/vagrant/.ssh/authorized_keys || echo "$PUB_KEY" >> /home/vagrant/.ssh/authorized_keys
+  chmod 600 /home/vagrant/.ssh/authorized_keys
 fi
-chmod 600 /home/vagrant/.ssh/authorized_keys
-chown -R vagrant:vagrant /home/vagrant/.ssh
 
 cat > /home/vagrant/.ssh/config <<EOF
 Host vm1 vm2 vm3 192.168.56.*
@@ -72,25 +102,23 @@ Host vm1 vm2 vm3 192.168.56.*
     LogLevel ERROR
 EOF
 chmod 600 /home/vagrant/.ssh/config
-chown vagrant:vagrant /home/vagrant/.ssh/config
+chown -R vagrant:vagrant /home/vagrant/.ssh
 
 echo "vagrant ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/vagrant
 chmod 440 /etc/sudoers.d/vagrant
 
-echo "===> [$(hostname)] Désactivation firewall (lab uniquement)"
+echo "===> Firewall et swap"
 systemctl stop ufw 2>/dev/null || true
 systemctl disable ufw 2>/dev/null || true
-
-echo "===> [$(hostname)] Désactivation swap (recommandé pour Kolla)"
 swapoff -a || true
 sed -i.bak '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
 
 echo ""
 echo "============================================================"
-echo " Bootstrap terminé sur $(hostname)"
-echo " Interface management : enp0s8  (192.168.56.x)"
-echo " Interface provider   : $PROVIDER_IF  (UP, sans IP)"
-if [ "$(hostname)" = "vm3" ]; then
-  echo " Disque Cinder        : /dev/sdb (30 Go, à préparer LVM manuellement)"
+echo " Bootstrap OK sur $TARGET_HOST"
+echo "   Mgmt     : $MGMT_IF ($MGMT_IP)"
+echo "   Provider : $PROVIDER_IF (UP, sans IP)"
+if [ "$TARGET_HOST" = "vm3" ]; then
+  echo "   Disque Cinder : /dev/sdb (à préparer LVM manuellement)"
 fi
 echo "============================================================"
