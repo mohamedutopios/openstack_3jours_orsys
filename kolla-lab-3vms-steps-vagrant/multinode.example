@@ -1,0 +1,141 @@
+# Inventaire Kolla-Ansible Multinode - 3 VMs rôles séparés
+# vm1 = controller   | vm2 = compute   | vm3 = network + storage
+
+[control]
+vm1 ansible_host=192.168.56.10 ansible_user=vagrant
+
+[network]
+vm3 ansible_host=192.168.56.12 ansible_user=vagrant
+
+[compute]
+vm2 ansible_host=192.168.56.11 ansible_user=vagrant
+
+[monitoring]
+vm1 ansible_host=192.168.56.10 ansible_user=vagrant
+
+[storage]
+vm3 ansible_host=192.168.56.12 ansible_user=vagrant
+
+[deployment]
+localhost ansible_connection=local
+
+# ----- Groupes hérités (à NE PAS modifier sauf cas particulier) -----
+[baremetal:children]
+control
+network
+compute
+storage
+monitoring
+
+[tls-backend:children]
+control
+
+[common:children]
+control
+network
+compute
+storage
+monitoring
+
+[collectd:children]
+compute
+
+[grafana:children]
+monitoring
+
+[etcd:children]
+control
+
+[influxdb:children]
+monitoring
+
+[prometheus:children]
+monitoring
+
+[kafka:children]
+control
+
+[telegraf:children]
+compute
+control
+monitoring
+network
+storage
+
+[redis:children]
+control
+
+[openvswitch:children]
+network
+compute
+manila-share
+
+[mariadb:children]
+control
+
+[loadbalancer:children]
+network
+
+[rabbitmq:children]
+control
+
+[outward-rabbitmq:children]
+control
+
+[monasca-agent:children]
+compute
+control
+monitoring
+network
+storage
+
+[monasca:children]
+monitoring
+
+[storm:children]
+monitoring
+
+[keystone:children]
+control
+
+[glance:children]
+control
+
+[nova:children]
+control
+
+[neutron:children]
+network
+
+[placement:children]
+control
+
+[horizon:children]
+control
+
+[memcached:children]
+control
+
+[manila-share:children]
+network
+
+[cinder:children]
+control
+
+[cinder-api:children]
+control
+
+[cinder-scheduler:children]
+control
+
+[cinder-volume:children]
+storage
+
+[cinder-backup:children]
+storage
+
+# ⚠️ Important : avec cette structure, [loadbalancer:children] = network
+# signifie que HAProxy/Keepalived seraient sur vm3 (network).
+# Pour notre lab, on garde HAProxy sur vm1 en l'override ci-dessous :
+[loadbalancer]
+vm1 ansible_host=192.168.56.10 ansible_user=vagrant

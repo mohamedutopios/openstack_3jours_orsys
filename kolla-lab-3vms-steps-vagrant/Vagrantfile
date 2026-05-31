@@ -1,0 +1,106 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+#
+# Lab Kolla-Ansible Multinode (3 VMs) - Rôles séparés
+# - vm1 : controller (plan de contrôle : APIs + DB + MQ)
+# - vm2 : compute    (hyperviseur : exécute les instances)
+# - vm3 : network + storage (agents Neutron + cinder-volume LVM)
+#
+# Réseaux :
+#   - eth0 : NAT (Internet)
+#   - eth1 : Host-Only 192.168.56.0/24  (management/API, accessible Windows)
+#   - eth2 : Host-Only 192.168.57.0/24  (provider Neutron, sans IP côté guest)
+#
+# Disques :
+#   - sda : système (toutes les VMs, ~64 Go par défaut bento)
+#   - sdb : Cinder LVM 30 Go (vm3 uniquement)
+#
+# RAM totale consommée : 8 + 6 + 4 = 18 Go
+# Prévoir 20+ Go sur l'hôte Windows pour confort.
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "bento/ubuntu-22.04"
+  config.vm.box_check_update = false
+
+  # Clés SSH partagées (générées par generate-ssh.sh/ps1)
+  config.vm.provision "file", source: "./ssh/id_rsa",     destination: "/home/vagrant/.ssh/id_rsa"
+  config.vm.provision "file", source: "./ssh/id_rsa.pub", destination: "/home/vagrant/.ssh/id_rsa.pub"
+
+  # Script de préparation commun
+  config.vm.provision "shell", path: "bootstrap.sh"
+
+  # =========================================================
+  #  VM1 : Controller (plan de contrôle)
+  #  - Keystone, Glance, Nova APIs, Neutron-server, Placement
+  #  - Cinder APIs (mais PAS cinder-volume)
+  #  - Horizon, HAProxy, Keepalived
+  #  - MariaDB, RabbitMQ, Memcached
+  # =========================================================
+  config.vm.define "vm1" do |vm1|
+    vm1.vm.hostname = "vm1"
+
+    vm1.vm.network "private_network", ip: "192.168.56.10"
+    vm1.vm.network "private_network",
+                   ip: "192.168.57.10",
+                   auto_config: false
+
+    vm1.vm.provider "virtualbox" do |vb|
+      vb.name   = "kolla-vm1"
+      vb.memory = 8192    # 8 Go : DB + MQ + tous les APIs
+      vb.cpus   = 4
+      vb.customize ["modifyvm", :id, "--nicpromisc3", "allow-all"]
+      vb.customize ["modifyvm", :id, "--nested-hw-virt", "on"]
+    end
+    # Pas de disque supplémentaire : controller pur
+  end
+
+  # =========================================================
+  #  VM2 : Compute (hyperviseur)
+  #  - nova-compute (exécute les VMs QEMU)
+  #  - neutron-openvswitch-agent
+  #  - iscsi-initiator (client iSCSI vers vm3 pour Cinder)
+  # =========================================================
+  config.vm.define "vm2" do |vm2|
+    vm2.vm.hostname = "vm2"
+
+    vm2.vm.network "private_network", ip: "192.168.56.11"
+    vm2.vm.network "private_network",
+                   ip: "192.168.57.11",
+                   auto_config: false
+
+    vm2.vm.provider "virtualbox" do |vb|
+      vb.name   = "kolla-vm2"
+      vb.memory = 6144    # 6 Go : RAM des instances OpenStack
+      vb.cpus   = 2
+      vb.customize ["modifyvm", :id, "--nicpromisc3", "allow-all"]
+      vb.customize ["modifyvm", :id, "--nested-hw-virt", "on"]
+    end
+    # Pas de disque supplémentaire : compute pur
+  end
+
+  # =========================================================
+  #  VM3 : Network + Storage (data plane)
+  #  - neutron-dhcp-agent, l3-agent, metadata-agent, ovs-agent
+  #  - cinder-volume (avec backend LVM sur /dev/sdb)
+  #  - iscsi-target (expose les volumes Cinder)
+  # =========================================================
+  config.vm.define "vm3" do |vm3|
+    vm3.vm.hostname = "vm3"
+
+    vm3.vm.network "private_network", ip: "192.168.56.12"
+    vm3.vm.network "private_network",
+                   ip: "192.168.57.12",
+                   auto_config: false
+
+    vm3.vm.provider "virtualbox" do |vb|
+      vb.name   = "kolla-vm3"
+      vb.memory = 4096    # 4 Go : agents légers + cinder-volume
+      vb.cpus   = 2
+      vb.customize ["modifyvm", :id, "--nicpromisc3", "allow-all"]
+      vb.customize ["modifyvm", :id, "--nested-hw-virt", "on"]
+    end
+
+    # Disque dédié Cinder LVM (30 Go, sera /dev/sdb)
+    vm3.vm.disk :disk, size: "30GB", name: "vm3-cinder"
+  end
+end
