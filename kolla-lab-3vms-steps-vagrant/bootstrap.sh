@@ -1,11 +1,8 @@
 #!/bin/bash
 # Bootstrap idempotent - détecte dynamiquement les interfaces
-# (compatible eth0/eth1/eth2 ET enp0s3/enp0s8/enp0s9)
 set -e
 
 echo "===> Détection des interfaces réseau"
-
-# Liste toutes les interfaces ethernet (hors lo), dans l'ordre
 INTERFACES=$(ls /sys/class/net/ | grep -E '^(eth|en)' | sort)
 echo "    Interfaces détectées : $INTERFACES"
 
@@ -22,11 +19,9 @@ echo "    NAT      : $NAT_IF"
 echo "    Mgmt     : $MGMT_IF"
 echo "    Provider : $PROVIDER_IF"
 
-# Mémorise les noms pour usage ultérieur
 echo "$MGMT_IF"     > /etc/kolla-mgmt-interface
 echo "$PROVIDER_IF" > /etc/kolla-provider-interface
 
-# Détecte le hostname cible via /tmp/vagrant_hostname (déposé par Vagrant)
 if [ -f /tmp/vagrant_hostname ]; then
   TARGET_HOST=$(cat /tmp/vagrant_hostname)
   hostnamectl set-hostname "$TARGET_HOST"
@@ -38,15 +33,12 @@ case "$TARGET_HOST" in
   vm1) MGMT_IP="192.168.56.10" ;;
   vm2) MGMT_IP="192.168.56.11" ;;
   vm3) MGMT_IP="192.168.56.12" ;;
-  *)
-    echo "!! Hostname inconnu : $TARGET_HOST"
-    exit 1
-    ;;
+  *) echo "!! Hostname inconnu : $TARGET_HOST" ; exit 1 ;;
 esac
 
 echo "===> Hostname: $TARGET_HOST, Mgmt IP: $MGMT_IP"
 
-echo "===> Reconfiguration netplan complète"
+echo "===> Reconfiguration netplan (avec DNS explicite)"
 rm -f /etc/netplan/*.yaml
 cat > /etc/netplan/01-kolla.yaml <<EOF
 network:
@@ -54,6 +46,10 @@ network:
   ethernets:
     $NAT_IF:
       dhcp4: true
+      dhcp4-overrides:
+        use-dns: true
+      nameservers:
+        addresses: [8.8.8.8, 1.1.1.1]
     $MGMT_IF:
       addresses: [$MGMT_IP/24]
     $PROVIDER_IF:
@@ -65,6 +61,33 @@ EOF
 chmod 600 /etc/netplan/01-kolla.yaml
 netplan apply
 ip link set "$PROVIDER_IF" up
+
+# Forcer un resolv.conf utilisable même si systemd-resolved foire
+echo "===> DNS de secours dans /etc/resolv.conf"
+rm -f /etc/resolv.conf
+cat > /etc/resolv.conf <<EOF
+nameserver 8.8.8.8
+nameserver 1.1.1.1
+EOF
+chattr +i /etc/resolv.conf 2>/dev/null || true
+
+# Tester la résolution AVANT apt
+echo "===> Test connectivité Internet"
+for i in 1 2 3 4 5; do
+  if getent hosts archive.ubuntu.com >/dev/null 2>&1 && \
+     curl -s --max-time 5 http://archive.ubuntu.com/ >/dev/null 2>&1; then
+    echo "    OK (tentative $i)"
+    break
+  fi
+  echo "    Tentative $i/5 : pas d'accès, attente 5s..."
+  sleep 5
+  if [ $i -eq 5 ]; then
+    echo "!! Pas d'accès Internet, abandon"
+    cat /etc/resolv.conf
+    ip route
+    exit 1
+  fi
+done
 
 echo "===> Paquets de base"
 export DEBIAN_FRONTEND=noninteractive
