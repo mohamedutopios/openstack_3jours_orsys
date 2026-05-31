@@ -1,0 +1,3 @@
+# Les rings Swift (account/container/object .builder et .ring.gz) sont
+# générés ici par scripts/31-build-swift-rings.sh.
+# Ce répertoire doit être copié vers /etc/kolla/config/swift/ sur l'hôte.

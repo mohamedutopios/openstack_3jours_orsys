@@ -1,0 +1,14 @@
+[Unit]
+Description=Reattach loopback device for Cinder LVM
+DefaultDependencies=no
+After=local-fs.target
+Before=lvm2-activation.service docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/sbin/losetup /dev/loop10 /var/lib/cinder-volumes.img
+ExecStop=/sbin/losetup -d /dev/loop10
+
+[Install]
+WantedBy=multi-user.target

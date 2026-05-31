@@ -1,0 +1,40 @@
+---
+# =============================================================
+# Kolla-Ansible — globals.yml — All-in-One (formation 3 jours)
+# Release : 2024.1 Caracal — Ubuntu 22.04
+# Services : Keystone, Nova, Neutron, Cinder, Horizon
+# =============================================================
+
+# --- Base image / release ---
+kolla_base_distro: "ubuntu"
+openstack_release: "2024.1"
+
+# --- VIP HAProxy/keepalived (IP LIBRE sur le LAN management) ---
+kolla_internal_vip_address: "192.168.10.250"
+
+# --- Interfaces réseau de l'hôte ---
+# network_interface : NIC qui porte l'IP de management
+# neutron_external_interface : NIC nue (UP, sans IP) pour le réseau externe
+network_interface: "ens3"
+neutron_external_interface: "ens4"
+
+# --- Services activés ---
+enable_keystone: "yes"
+enable_nova: "yes"
+enable_neutron: "yes"
+enable_horizon: "yes"
+enable_cinder: "yes"
+
+# --- Cinder : backend LVM ---
+enable_cinder_backend_lvm: "yes"
+cinder_volume_group: "cinder-volumes"
+
+# --- Neutron : ML2/OVS + VXLAN (override du défaut OVN de Caracal) ---
+neutron_plugin_agent: "openvswitch"
+
+# --- Désactivations explicites (hors périmètre formation) ---
+enable_heat: "no"
+enable_horizon_heat: "no"
+
+# --- Optionnel : si vous êtes en VM avec MTU 1500, décommentez ---
+# neutron_global_physnet_mtu: 1450

@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Variables AWS communes à tous les scripts de provisionnement.
+# Copier en 00-vars.sh et adapter.
+#
+#   cp 00-vars.sh.example 00-vars.sh
+#   $EDITOR 00-vars.sh
+#   source 00-vars.sh
+
+# --- AWS region / zone ---
+export AWS_REGION="eu-west-3"
+export AWS_AZ="${AWS_REGION}a"
+
+# --- AMI Ubuntu 22.04 LTS amd64 (Canonical) ---
+# Trouver l'ID via :
+#   aws ec2 describe-images --owners 099720109477 \
+#     --filters 'Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*' \
+#               'Name=state,Values=available' \
+#     --query 'sort_by(Images,&CreationDate)[-1].ImageId' --output text
+export AMI_ID="ami-XXXXXXXXXXXXXXXXX"
+
+# --- Keypair SSH (déjà créée dans EC2) ---
+export KEY_NAME="formation-openstack"
+export KEY_FILE="$HOME/.ssh/${KEY_NAME}.pem"
+
+# --- Type d'instance ---
+export INSTANCE_TYPE="m5.2xlarge"
+
+# --- CIDRs ---
+export VPC_CIDR="10.0.0.0/16"
+export SUBNET_MGMT_CIDR="10.0.1.0/24"
+export SUBNET_EXT_CIDR="10.0.99.0/24"
+
+# --- IPs des 3 nodes (subnet mgmt) ---
+export NODE1_IP="10.0.1.11"
+export NODE2_IP="10.0.1.12"
+export NODE3_IP="10.0.1.13"
+
+# --- VIP (sera ajouté en IP secondaire sur ENI1 de node1) ---
+export VIP="10.0.1.10"
+
+# --- IP autorisée pour SSH/HTTP/HTTPS depuis l'extérieur ---
+# Récupérer la vôtre : curl -s ifconfig.me
+export ADMIN_IP_CIDR="$(curl -s ifconfig.me)/32"
+
+# --- Tag commun à toutes les ressources ---
+export PROJECT_TAG="formation-kolla-multinode"
+
+# --- Tailles EBS (Go) ---
+export ROOT_GB=50
+export CINDER_GB=50
+export SWIFT_GB=20
+
+# --- Fichier d'état partagé entre scripts ---
+export STATE_FILE="$(dirname "${BASH_SOURCE[0]}")/state.env"

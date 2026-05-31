@@ -1,0 +1,2126 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 1 — Conception d'un Cloud OpenStack</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0E1C33;
+    --blue: #0057B8;
+    --cyan: #00AEEF;
+    --light: #F5F7FA;
+    --white: #FFFFFF;
+    --gray: #6B7A8F;
+    --gray-light: #E5EAF0;
+    --green: #10B981;
+    --orange: #F59E0B;
+    --red: #EF4444;
+    --purple: #8B5CF6;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: #000;
+    color: var(--navy);
+    line-height: 1.5;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+  }
+
+  /* ===== Deck en mode présentation ===== */
+  .deck {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+    overflow: hidden;
+  }
+
+  /* Toutes les slides empilées, seule l'active visible */
+  .slide {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.96);
+    width: min(92vw, calc(92vh * 16 / 9));
+    height: min(92vh, calc(92vw * 9 / 16));
+    aspect-ratio: 16 / 9;
+    background: var(--white);
+    border-radius: 16px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+    padding: 3.5% 4.5%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.45s ease, transform 0.45s ease;
+    margin-bottom: 0;
+  }
+  .slide.active {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    pointer-events: auto;
+  }
+
+  /* Numéro et marque dans la slide (positions originales) */
+  .slide-number {
+    position: absolute;
+    bottom: 24px;
+    right: 32px;
+    font-size: 13px;
+    color: var(--gray);
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .brand-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 6px;
+    background: linear-gradient(90deg, var(--navy) 0%, var(--blue) 50%, var(--cyan) 100%);
+  }
+  .brand-tag {
+    position: absolute;
+    bottom: 24px;
+    left: 32px;
+    font-size: 12px;
+    color: var(--gray);
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  h1 { font-size: 42px; font-weight: 800; color: var(--navy); line-height: 1.15; margin-bottom: 16px; }
+  h2 { font-size: 32px; font-weight: 700; color: var(--navy); margin-bottom: 24px; line-height: 1.2; }
+  h3 { font-size: 20px; font-weight: 700; color: var(--blue); margin-bottom: 12px; }
+  h4 { font-size: 16px; font-weight: 700; color: var(--navy); margin-bottom: 8px; }
+  p { font-size: 15px; color: var(--navy); margin-bottom: 12px; }
+  .subtitle { font-size: 18px; color: var(--gray); font-weight: 400; margin-bottom: 24px; }
+  ul { list-style: none; }
+  li {
+    font-size: 15px;
+    padding: 6px 0 6px 24px;
+    position: relative;
+    color: var(--navy);
+  }
+  li::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 14px;
+    width: 8px; height: 8px;
+    background: var(--cyan);
+    border-radius: 50%;
+  }
+  .code {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--navy);
+    color: var(--cyan);
+    padding: 16px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.7;
+    overflow-x: auto;
+  }
+  .code .kw { color: #FF7AB6; }
+  .code .str { color: #A5E075; }
+  .code .cm { color: #7B8CA8; font-style: italic; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; flex: 1; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; flex: 1; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; flex: 1; }
+  .card {
+    background: var(--light);
+    border-radius: 12px;
+    padding: 20px;
+    border-left: 4px solid var(--blue);
+  }
+  .card.cyan { border-left-color: var(--cyan); }
+  .card.navy { border-left-color: var(--navy); }
+  .card.green { border-left-color: var(--green); }
+  .card.orange { border-left-color: var(--orange); }
+  .card.purple { border-left-color: var(--purple); }
+  .badge {
+    display: inline-block;
+    background: var(--cyan);
+    color: var(--white);
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .badge.blue { background: var(--blue); }
+  .badge.navy { background: var(--navy); }
+  .badge.green { background: var(--green); }
+  .badge.orange { background: var(--orange); }
+  .badge.purple { background: var(--purple); }
+  .module-tag {
+    display: inline-block;
+    background: rgba(0, 174, 239, 0.12);
+    color: var(--blue);
+    padding: 6px 14px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  /* Title slide */
+  .title-slide {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
+    color: var(--white);
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .title-slide h1 { color: var(--white); font-size: 56px; }
+  .title-slide .subtitle { color: rgba(255,255,255,0.85); font-size: 22px; }
+  .title-slide .brand-tag { color: rgba(255,255,255,0.6); }
+  .title-slide .slide-number { color: rgba(255,255,255,0.5); }
+  .title-slide .module-tag {
+    background: rgba(0, 174, 239, 0.25);
+    color: var(--cyan);
+  }
+  .decorative-circle {
+    position: absolute;
+    border-radius: 50%;
+    opacity: 0.08;
+    background: var(--cyan);
+  }
+  .diagram { width: 100%; height: 100%; }
+  .diagram-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 0;
+  }
+  text { font-family: 'Plus Jakarta Sans', sans-serif; }
+  .divider {
+    background: var(--navy);
+    color: var(--white);
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+  }
+  .divider h1 { color: var(--white); font-size: 64px; }
+  .divider .subtitle { color: var(--cyan); }
+  .divider .brand-tag, .divider .slide-number { color: rgba(255,255,255,0.5); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { background: var(--navy); color: var(--white); padding: 10px 12px; text-align: left; font-weight: 600; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--gray-light); }
+  tr:nth-child(even) td { background: var(--light); }
+  .check { color: var(--green); font-weight: 700; }
+  .cross { color: var(--red); font-weight: 700; }
+  .pill {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--gray-light);
+    color: var(--navy);
+    margin-right: 4px;
+  }
+  .pill.cyan { background: rgba(0,174,239,0.15); color: var(--blue); }
+  .pill.green { background: rgba(16,185,129,0.15); color: #047857; }
+  .pill.orange { background: rgba(245,158,11,0.15); color: #B45309; }
+  .flex-row { display: flex; gap: 24px; flex: 1; }
+  .flex-col { flex: 1; }
+  .num {
+    display: inline-flex;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--blue);
+    color: var(--white);
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+    margin-right: 10px;
+  }
+  .num.cyan { background: var(--cyan); }
+  .num.navy { background: var(--navy); }
+  .stat { text-align: center; }
+  .stat-num { font-size: 40px; font-weight: 800; color: var(--blue); line-height: 1; }
+  .stat-label { font-size: 13px; color: var(--gray); margin-top: 8px; }
+
+  /* ===== Controls UI (mode présentation) ===== */
+  .controls {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    background: rgba(14, 28, 51, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 8px 12px;
+    border-radius: 999px;
+    z-index: 1000;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .deck:hover .controls,
+  .controls:hover,
+  .controls.show {
+    opacity: 1;
+  }
+  .ctrl-btn {
+    background: transparent;
+    border: none;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    font-size: 16px;
+  }
+  .ctrl-btn:hover { background: rgba(255,255,255,0.15); }
+  .ctrl-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .ctrl-counter {
+    color: white;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    padding: 0 12px;
+    min-width: 70px;
+    text-align: center;
+    user-select: none;
+  }
+  .ctrl-counter input {
+    width: 32px;
+    background: transparent;
+    border: none;
+    color: white;
+    font-family: inherit;
+    font-size: inherit;
+    text-align: right;
+    outline: none;
+    border-bottom: 1px solid transparent;
+  }
+  .ctrl-counter input:focus { border-bottom-color: var(--cyan); }
+
+  /* Progress bar */
+  .progress {
+    position: fixed;
+    top: 0; left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--blue), var(--cyan));
+    z-index: 1001;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 10px rgba(0, 174, 239, 0.6);
+  }
+
+  /* Overview/grid mode */
+  .deck.overview {
+    overflow-y: auto;
+    background: #0a1220;
+    padding: 60px 40px;
+  }
+  .deck.overview .slide {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16/9;
+    opacity: 1;
+    pointer-events: auto;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .deck.overview .slide:hover {
+    transform: scale(1.02);
+    box-shadow: 0 12px 32px rgba(0, 174, 239, 0.3);
+  }
+  .deck.overview .slide.active {
+    outline: 3px solid var(--cyan);
+    outline-offset: 4px;
+  }
+  .deck.overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 24px;
+    place-items: stretch;
+  }
+
+  /* Hint au démarrage */
+  .hint {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(14, 28, 51, 0.85);
+    backdrop-filter: blur(10px);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-size: 12px;
+    z-index: 1000;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  .hint.show { opacity: 1; }
+  .hint kbd {
+    background: rgba(255,255,255,0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    margin: 0 2px;
+  }
+
+  /* Print : tout afficher en pages */
+  @media print {
+    html, body { background: white; overflow: visible; height: auto; }
+    .deck { display: block; height: auto; width: auto; }
+    .slide {
+      position: relative;
+      top: auto; left: auto;
+      transform: none;
+      width: 100%;
+      page-break-after: always;
+      box-shadow: none;
+      opacity: 1 !important;
+      pointer-events: auto !important;
+      margin-bottom: 0;
+      border-radius: 0;
+    }
+    .controls, .progress, .hint { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<div class="hint" id="hint">
+  <kbd>←</kbd> <kbd>→</kbd> naviguer &nbsp; · &nbsp; <kbd>F</kbd> plein écran &nbsp; · &nbsp; <kbd>O</kbd> vue d'ensemble
+</div>
+<div class="deck" id="deck">
+
+<!-- ====================== SLIDE 1 : TITRE ====================== -->
+<div class="slide title-slide">
+  <div class="brand-bar"></div>
+  <div class="decorative-circle" style="width: 400px; height: 400px; top: -100px; right: -100px;"></div>
+  <div class="decorative-circle" style="width: 250px; height: 250px; bottom: -80px; left: -80px;"></div>
+  <span class="module-tag">Module 1 / 7</span>
+  <h1>Conception d'un Cloud OpenStack</h1>
+  <p class="subtitle">Comprendre l'écosystème Cloud, le projet OpenStack et son architecture</p>
+  <div style="margin-top: 40px; display: flex; gap: 40px;">
+    <div>
+      <div style="font-size: 12px; opacity: 0.7; text-transform: uppercase; letter-spacing: 1px;">Durée</div>
+      <div style="font-size: 24px; font-weight: 700; margin-top: 4px;">Jour 1 — Matinée</div>
+    </div>
+    <div>
+      <div style="font-size: 12px; opacity: 0.7; text-transform: uppercase; letter-spacing: 1px;">Niveau</div>
+      <div style="font-size: 24px; font-weight: 700; margin-top: 4px;">Intermédiaire</div>
+    </div>
+    <div>
+      <div style="font-size: 12px; opacity: 0.7; text-transform: uppercase; letter-spacing: 1px;">TP final</div>
+      <div style="font-size: 24px; font-weight: 700; margin-top: 4px;">Installation OpenStack</div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Formation OpenStack</div>
+  <div class="slide-number">01 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 2 : SOMMAIRE ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">Plan du module</span>
+  <h1>Sommaire</h1>
+  <div class="grid-2" style="margin-top: 24px;">
+    <div>
+      <div class="card cyan" style="margin-bottom: 16px;">
+        <h3><span class="num cyan">1</span>Le Cloud Computing</h3>
+        <p style="font-size: 13px; color: var(--gray); margin-left: 42px;">Définition, apports, modèles de service (SaaS, PaaS, IaaS) et modèles de déploiement</p>
+      </div>
+      <div class="card" style="margin-bottom: 16px;">
+        <h3><span class="num">2</span>Le projet OpenStack</h3>
+        <p style="font-size: 13px; color: var(--gray); margin-left: 42px;">Historique, fondation, gouvernance, cycle de release et écosystème</p>
+      </div>
+    </div>
+    <div>
+      <div class="card navy" style="margin-bottom: 16px;">
+        <h3><span class="num navy">3</span>Architecture OpenStack</h3>
+        <p style="font-size: 13px; color: var(--gray); margin-left: 42px;">Vue d'ensemble des briques (Nova, Neutron, Swift, Cinder, Glance, Keystone, Horizon)</p>
+      </div>
+      <div class="card orange" style="margin-bottom: 16px;">
+        <h3><span class="num" style="background: var(--orange);">4</span>Méthodes d'installation</h3>
+        <p style="font-size: 13px; color: var(--gray); margin-left: 42px;">DevStack, Packstack, Kolla-Ansible, OpenStack-Ansible, distributions commerciales</p>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">02 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 3 : QU'EST-CE QUE LE CLOUD ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">1. Le Cloud Computing</span>
+  <h1>Qu'est-ce que le Cloud Computing ?</h1>
+  <p class="subtitle">Définition NIST (National Institute of Standards and Technology)</p>
+  <div style="background: var(--light); border-left: 6px solid var(--cyan); padding: 20px 24px; border-radius: 8px; margin: 16px 0 24px 0;">
+    <p style="font-style: italic; color: var(--navy); font-size: 16px; margin: 0;">
+      « Un modèle permettant un accès <strong>ubiquitaire, pratique et à la demande</strong>, via un réseau, à un pool partagé de ressources informatiques configurables (réseau, serveurs, stockage, applications, services) qui peuvent être rapidement provisionnées et libérées avec un minimum d'effort de gestion ou d'interaction avec le fournisseur. »
+    </p>
+  </div>
+  <h3>Les 5 caractéristiques essentielles du Cloud</h3>
+  <div class="grid-3" style="margin-top: 12px;">
+    <div class="card cyan">
+      <h4>📡 Self-service à la demande</h4>
+      <p style="font-size: 12px;">L'utilisateur provisionne lui-même ses ressources sans intervention humaine</p>
+    </div>
+    <div class="card">
+      <h4>🌐 Accès réseau étendu</h4>
+      <p style="font-size: 12px;">Disponible depuis n'importe quel terminal via le réseau (HTTP/API)</p>
+    </div>
+    <div class="card navy">
+      <h4>🏊 Mise en commun</h4>
+      <p style="font-size: 12px;">Mutualisation des ressources (multi-tenancy) entre clients</p>
+    </div>
+    <div class="card green">
+      <h4>⚡ Élasticité rapide</h4>
+      <p style="font-size: 12px;">Capacité à monter ou descendre en charge automatiquement</p>
+    </div>
+    <div class="card orange">
+      <h4>📊 Service mesuré</h4>
+      <p style="font-size: 12px;">Facturation à l'usage (pay-as-you-go) et reporting détaillé</p>
+    </div>
+    <div class="card purple">
+      <h4>🔄 Standardisation</h4>
+      <p style="font-size: 12px;">APIs uniformes et automatisables (REST, CLI, SDK)</p>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">03 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 4 : APPORTS DU CLOUD ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">1. Le Cloud Computing</span>
+  <h1>Apports du Cloud par rapport à l'IT traditionnelle</h1>
+  <div class="grid-2" style="margin-top: 16px;">
+    <div>
+      <h3>❌ IT traditionnelle (on-premise)</h3>
+      <ul>
+        <li>CAPEX lourd : achat de serveurs, licences, datacenter</li>
+        <li>Délais de provisionnement de plusieurs semaines</li>
+        <li>Sur-dimensionnement pour absorber les pics</li>
+        <li>Maintenance matérielle et logicielle à la charge de l'entreprise</li>
+        <li>Évolutivité limitée par les achats budgétaires</li>
+        <li>Compétences silotées (réseau, stockage, virtu, OS)</li>
+      </ul>
+    </div>
+    <div>
+      <h3>✅ Cloud Computing</h3>
+      <ul>
+        <li>OPEX maîtrisé : facturation à l'usage (heure, Go, requête)</li>
+        <li>Provisionnement en quelques minutes via API</li>
+        <li>Élasticité automatique (auto-scaling)</li>
+        <li>Délégation de l'infrastructure au fournisseur</li>
+        <li>Innovation rapide via les services managés</li>
+        <li>Équipes DevOps transverses et automatisation</li>
+      </ul>
+    </div>
+  </div>
+  <div style="background: var(--navy); color: var(--white); padding: 20px 24px; border-radius: 12px; margin-top: 24px;">
+    <h4 style="color: var(--cyan); margin-bottom: 8px;">💡 À retenir</h4>
+    <p style="color: var(--white); margin: 0; font-size: 14px;">
+      Le Cloud transforme l'infrastructure en un <strong>service consommable comme l'électricité</strong>. On parle de <em>"computing as a utility"</em>. Le défi n'est plus de posséder le matériel mais de l'utiliser efficacement.
+    </p>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">04 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 5 : MODELES DE SERVICE - PYRAMIDE ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">1. Le Cloud Computing</span>
+  <h1>Les 3 modèles de service : IaaS, PaaS, SaaS</h1>
+  <div class="diagram-container">
+    <svg viewBox="0 0 1100 440" class="diagram">
+      <!-- IaaS layer -->
+      <rect x="100" y="320" width="900" height="90" rx="8" fill="#0057B8"/>
+      <text x="550" y="358" text-anchor="middle" fill="white" font-size="22" font-weight="700">IaaS — Infrastructure as a Service</text>
+      <text x="550" y="385" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="13">Compute, Stockage, Réseau, Virtualisation • OpenStack, AWS EC2, Azure VM</text>
+      <!-- PaaS layer -->
+      <rect x="180" y="200" width="740" height="90" rx="8" fill="#00AEEF"/>
+      <text x="550" y="238" text-anchor="middle" fill="white" font-size="22" font-weight="700">PaaS — Platform as a Service</text>
+      <text x="550" y="265" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="13">Runtime, Bases de données, Middleware • Heroku, OpenShift, App Engine</text>
+      <!-- SaaS layer -->
+      <rect x="260" y="80" width="580" height="90" rx="8" fill="#0E1C33"/>
+      <text x="550" y="118" text-anchor="middle" fill="white" font-size="22" font-weight="700">SaaS — Software as a Service</text>
+      <text x="550" y="145" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="13">Applications finales • Gmail, Salesforce, Microsoft 365</text>
+      <!-- Arrow up - abstraction -->
+      <line x1="50" y1="410" x2="50" y2="80" stroke="#6B7A8F" stroke-width="2" marker-end="url(#arrowUp)"/>
+      <defs>
+        <marker id="arrowUp" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+          <polygon points="0,10 5,0 10,10" fill="#6B7A8F"/>
+        </marker>
+      </defs>
+      <text x="30" y="245" text-anchor="middle" fill="#6B7A8F" font-size="12" transform="rotate(-90 30 245)">Niveau d'abstraction</text>
+      <!-- Arrow down - control -->
+      <line x1="1050" y1="80" x2="1050" y2="410" stroke="#6B7A8F" stroke-width="2" marker-end="url(#arrowDown)"/>
+      <defs>
+        <marker id="arrowDown" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+          <polygon points="0,0 5,10 10,0" fill="#6B7A8F"/>
+        </marker>
+      </defs>
+      <text x="1075" y="245" text-anchor="middle" fill="#6B7A8F" font-size="12" transform="rotate(90 1075 245)">Contrôle utilisateur</text>
+      <!-- Labels -->
+      <text x="550" y="40" text-anchor="middle" fill="#0E1C33" font-size="14" font-weight="600">Plus on monte, plus l'utilisateur délègue au fournisseur</text>
+    </svg>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">05 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 6 : RESPONSABILITES IAAS/PAAS/SAAS ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">1. Le Cloud Computing</span>
+  <h1>Répartition des responsabilités</h1>
+  <p class="subtitle">Qui gère quoi entre le client et le fournisseur de Cloud ?</p>
+  <div class="diagram-container">
+    <svg viewBox="0 0 1100 360" class="diagram">
+      <!-- Headers -->
+      <text x="80" y="25" font-size="13" font-weight="700" fill="#0E1C33">Couches</text>
+      <text x="290" y="25" text-anchor="middle" font-size="13" font-weight="700" fill="#0E1C33">On-Premise</text>
+      <text x="490" y="25" text-anchor="middle" font-size="13" font-weight="700" fill="#0E1C33">IaaS</text>
+      <text x="690" y="25" text-anchor="middle" font-size="13" font-weight="700" fill="#0E1C33">PaaS</text>
+      <text x="890" y="25" text-anchor="middle" font-size="13" font-weight="700" fill="#0E1C33">SaaS</text>
+      <!-- Layers (rows) -->
+      <g font-size="12" font-weight="500">
+        <!-- Row labels -->
+        <text x="80" y="60" fill="#0E1C33">Applications</text>
+        <text x="80" y="92" fill="#0E1C33">Données</text>
+        <text x="80" y="124" fill="#0E1C33">Runtime</text>
+        <text x="80" y="156" fill="#0E1C33">Middleware</text>
+        <text x="80" y="188" fill="#0E1C33">OS</text>
+        <text x="80" y="220" fill="#0E1C33">Virtualisation</text>
+        <text x="80" y="252" fill="#0E1C33">Serveurs</text>
+        <text x="80" y="284" fill="#0E1C33">Stockage</text>
+        <text x="80" y="316" fill="#0E1C33">Réseau</text>
+      </g>
+      <!-- On-Premise column (all blue = client) -->
+      <g>
+        <rect x="220" y="42" width="140" height="22" fill="#0057B8"/>
+        <rect x="220" y="74" width="140" height="22" fill="#0057B8"/>
+        <rect x="220" y="106" width="140" height="22" fill="#0057B8"/>
+        <rect x="220" y="138" width="140" height="22" fill="#0057B8"/>
+        <rect x="220" y="170" width="140" height="22" fill="#0057B8"/>
+        <rect x="220" y="202" width="140" height="22" fill="#0057B8"/>
+        <rect x="220" y="234" width="140" height="22" fill="#0057B8"/>
+        <rect x="220" y="266" width="140" height="22" fill="#0057B8"/>
+        <rect x="220" y="298" width="140" height="22" fill="#0057B8"/>
+      </g>
+      <!-- IaaS column -->
+      <g>
+        <rect x="420" y="42" width="140" height="22" fill="#0057B8"/>
+        <rect x="420" y="74" width="140" height="22" fill="#0057B8"/>
+        <rect x="420" y="106" width="140" height="22" fill="#0057B8"/>
+        <rect x="420" y="138" width="140" height="22" fill="#0057B8"/>
+        <rect x="420" y="170" width="140" height="22" fill="#0057B8"/>
+        <rect x="420" y="202" width="140" height="22" fill="#00AEEF"/>
+        <rect x="420" y="234" width="140" height="22" fill="#00AEEF"/>
+        <rect x="420" y="266" width="140" height="22" fill="#00AEEF"/>
+        <rect x="420" y="298" width="140" height="22" fill="#00AEEF"/>
+      </g>
+      <!-- PaaS column -->
+      <g>
+        <rect x="620" y="42" width="140" height="22" fill="#0057B8"/>
+        <rect x="620" y="74" width="140" height="22" fill="#0057B8"/>
+        <rect x="620" y="106" width="140" height="22" fill="#00AEEF"/>
+        <rect x="620" y="138" width="140" height="22" fill="#00AEEF"/>
+        <rect x="620" y="170" width="140" height="22" fill="#00AEEF"/>
+        <rect x="620" y="202" width="140" height="22" fill="#00AEEF"/>
+        <rect x="620" y="234" width="140" height="22" fill="#00AEEF"/>
+        <rect x="620" y="266" width="140" height="22" fill="#00AEEF"/>
+        <rect x="620" y="298" width="140" height="22" fill="#00AEEF"/>
+      </g>
+      <!-- SaaS column -->
+      <g>
+        <rect x="820" y="42" width="140" height="22" fill="#00AEEF"/>
+        <rect x="820" y="74" width="140" height="22" fill="#00AEEF"/>
+        <rect x="820" y="106" width="140" height="22" fill="#00AEEF"/>
+        <rect x="820" y="138" width="140" height="22" fill="#00AEEF"/>
+        <rect x="820" y="170" width="140" height="22" fill="#00AEEF"/>
+        <rect x="820" y="202" width="140" height="22" fill="#00AEEF"/>
+        <rect x="820" y="234" width="140" height="22" fill="#00AEEF"/>
+        <rect x="820" y="266" width="140" height="22" fill="#00AEEF"/>
+        <rect x="820" y="298" width="140" height="22" fill="#00AEEF"/>
+      </g>
+    </svg>
+  </div>
+  <div style="display: flex; gap: 24px; justify-content: center; margin-top: 8px;">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <div style="width: 16px; height: 16px; background: #0057B8; border-radius: 3px;"></div>
+      <span style="font-size: 13px; font-weight: 600;">Géré par le client</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <div style="width: 16px; height: 16px; background: #00AEEF; border-radius: 3px;"></div>
+      <span style="font-size: 13px; font-weight: 600;">Géré par le fournisseur</span>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">06 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 7 : EXEMPLES DE SERVICES ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">1. Le Cloud Computing</span>
+  <h1>Exemples concrets et cas d'usage</h1>
+  <div class="grid-3" style="margin-top: 16px;">
+    <div>
+      <span class="badge">IaaS</span>
+      <h3 style="color: var(--blue);">Infrastructure as a Service</h3>
+      <h4>Exemples</h4>
+      <ul style="font-size: 13px;">
+        <li><strong>OpenStack</strong> (privé)</li>
+        <li>AWS EC2, EBS, VPC</li>
+        <li>Azure Virtual Machines</li>
+        <li>Google Compute Engine</li>
+      </ul>
+      <h4 style="margin-top: 12px;">Cas d'usage</h4>
+      <p style="font-size: 13px;">Hébergement de VM, environnements de dev/test, lift-and-shift, HPC, datalakes</p>
+    </div>
+    <div>
+      <span class="badge blue">PaaS</span>
+      <h3 style="color: var(--blue);">Platform as a Service</h3>
+      <h4>Exemples</h4>
+      <ul style="font-size: 13px;">
+        <li>OpenShift, Cloud Foundry</li>
+        <li>Heroku, AWS Elastic Beanstalk</li>
+        <li>Azure App Service</li>
+        <li>Google App Engine</li>
+      </ul>
+      <h4 style="margin-top: 12px;">Cas d'usage</h4>
+      <p style="font-size: 13px;">Déploiement applicatif rapide, API Gateways, fonctions managées, CI/CD intégré</p>
+    </div>
+    <div>
+      <span class="badge navy">SaaS</span>
+      <h3 style="color: var(--blue);">Software as a Service</h3>
+      <h4>Exemples</h4>
+      <ul style="font-size: 13px;">
+        <li>Microsoft 365, Google Workspace</li>
+        <li>Salesforce, HubSpot</li>
+        <li>Slack, Zoom</li>
+        <li>Dropbox, Notion</li>
+      </ul>
+      <h4 style="margin-top: 12px;">Cas d'usage</h4>
+      <p style="font-size: 13px;">Productivité bureautique, CRM, collaboration, messagerie, gestion documentaire</p>
+    </div>
+  </div>
+  <div style="background: var(--light); border-left: 4px solid var(--cyan); padding: 16px 20px; border-radius: 8px; margin-top: 24px;">
+    <p style="margin: 0; font-size: 14px;"><strong>OpenStack</strong> est positionné principalement comme une solution <strong>IaaS open source</strong>, mais des projets satellites (Magnum, Trove, Sahara, Heat) permettent d'exposer du PaaS sur les ressources OpenStack.</p>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">07 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 8 : MODELES DE DEPLOIEMENT ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">1. Le Cloud Computing</span>
+  <h1>Modèles de déploiement</h1>
+  <p class="subtitle">Cloud public, privé, hybride, communautaire — quelle stratégie ?</p>
+  <div class="grid-4" style="margin-top: 16px;">
+    <div class="card cyan">
+      <span class="badge">Public</span>
+      <h4>Cloud Public</h4>
+      <p style="font-size: 12px;">Ressources mutualisées chez un fournisseur tiers. AWS, Azure, GCP, OVHcloud.</p>
+      <h4 style="margin-top: 12px; font-size: 13px;">✓ Avantages</h4>
+      <p style="font-size: 11px;">Pas d'investissement initial, scalabilité quasi infinie</p>
+      <h4 style="margin-top: 8px; font-size: 13px;">✗ Inconvénients</h4>
+      <p style="font-size: 11px;">Souveraineté, conformité, coûts à long terme</p>
+    </div>
+    <div class="card navy">
+      <span class="badge navy">Privé</span>
+      <h4>Cloud Privé</h4>
+      <p style="font-size: 12px;">Infrastructure dédiée à une seule organisation. OpenStack, VMware Cloud.</p>
+      <h4 style="margin-top: 12px; font-size: 13px;">✓ Avantages</h4>
+      <p style="font-size: 11px;">Contrôle total, sécurité, conformité, isolation</p>
+      <h4 style="margin-top: 8px; font-size: 13px;">✗ Inconvénients</h4>
+      <p style="font-size: 11px;">CAPEX, compétences internes, élasticité limitée</p>
+    </div>
+    <div class="card purple">
+      <span class="badge purple">Hybride</span>
+      <h4>Cloud Hybride</h4>
+      <p style="font-size: 12px;">Mix privé + public avec interopérabilité (VPN, peering, fédération).</p>
+      <h4 style="margin-top: 12px; font-size: 13px;">✓ Avantages</h4>
+      <p style="font-size: 11px;">Flexibilité, cloud bursting, données sensibles isolées</p>
+      <h4 style="margin-top: 8px; font-size: 13px;">✗ Inconvénients</h4>
+      <p style="font-size: 11px;">Complexité, intégration, gouvernance</p>
+    </div>
+    <div class="card orange">
+      <span class="badge orange">Communautaire</span>
+      <h4>Cloud Communautaire</h4>
+      <p style="font-size: 12px;">Mutualisé entre plusieurs organisations partageant des préoccupations (gov, santé).</p>
+      <h4 style="margin-top: 12px; font-size: 13px;">✓ Avantages</h4>
+      <p style="font-size: 11px;">Mutualisation coûts, conformité sectorielle</p>
+      <h4 style="margin-top: 8px; font-size: 13px;">✗ Inconvénients</h4>
+      <p style="font-size: 11px;">Gouvernance partagée, niche</p>
+    </div>
+  </div>
+  <div style="background: var(--navy); color: var(--white); padding: 14px 20px; border-radius: 8px; margin-top: 20px;">
+    <p style="margin: 0; font-size: 13px; color: var(--white);"><strong style="color: var(--cyan);">OpenStack</strong> est le standard open source pour bâtir des clouds <strong>privés</strong> et <strong>publics</strong> (OVHcloud, Cleura, Infomaniak en sont des exemples publics). Il s'intègre dans des stratégies hybrides via des API compatibles AWS EC2/S3.</p>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">08 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 9 : DIVIDER OPENSTACK ====================== -->
+<div class="slide divider">
+  <div class="brand-bar"></div>
+  <div class="decorative-circle" style="width: 500px; height: 500px; top: -150px; right: -150px;"></div>
+  <span class="module-tag">Chapitre 2</span>
+  <h1>Le projet<br/>OpenStack</h1>
+  <p class="subtitle" style="margin-top: 24px;">Historique, gouvernance et écosystème</p>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">09 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 10 : OPENSTACK C'EST QUOI ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">2. Le projet OpenStack</span>
+  <h1>OpenStack : définition</h1>
+  <div style="background: linear-gradient(135deg, var(--navy), var(--blue)); color: var(--white); padding: 24px 28px; border-radius: 12px; margin: 16px 0 24px 0;">
+    <p style="font-size: 18px; line-height: 1.6; margin: 0; color: var(--white);">
+      OpenStack est une <strong>plateforme open source de Cloud Computing</strong> qui contrôle de larges pools de ressources <strong style="color: var(--cyan);">compute</strong>, <strong style="color: var(--cyan);">stockage</strong> et <strong style="color: var(--cyan);">réseau</strong> dans un datacenter, le tout administré via un dashboard ou des APIs.
+    </p>
+  </div>
+  <div class="grid-3">
+    <div class="card cyan">
+      <h4>🔓 Open Source</h4>
+      <p style="font-size: 13px;">Licence Apache 2.0 — code source publiquement disponible, contributions ouvertes à tous.</p>
+    </div>
+    <div class="card">
+      <h4>🧩 Modulaire</h4>
+      <p style="font-size: 13px;">Composé de projets indépendants (Nova, Neutron, Swift…) communiquant par API REST.</p>
+    </div>
+    <div class="card navy">
+      <h4>🏢 Standard du marché</h4>
+      <p style="font-size: 13px;">Soutenu par 500+ entreprises, déployé chez Walmart, CERN, AT&T, China Mobile, Yahoo!.</p>
+    </div>
+  </div>
+  <div style="margin-top: 24px;">
+    <h3>Quelques chiffres clés</h3>
+    <div class="grid-4" style="margin-top: 12px;">
+      <div class="stat">
+        <div class="stat-num">100M+</div>
+        <div class="stat-label">cœurs en production mondiale</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">180+</div>
+        <div class="stat-label">pays utilisant OpenStack</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">8500+</div>
+        <div class="stat-label">contributeurs</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">2 / an</div>
+        <div class="stat-label">releases majeures</div>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">10 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 11 : HISTORIQUE ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">2. Le projet OpenStack</span>
+  <h1>Historique et timeline</h1>
+  <div class="diagram-container">
+    <svg viewBox="0 0 1100 320" class="diagram">
+      <!-- Timeline axis -->
+      <line x1="60" y1="160" x2="1040" y2="160" stroke="#0E1C33" stroke-width="3"/>
+      <!-- Milestones -->
+      <g>
+        <circle cx="120" cy="160" r="10" fill="#00AEEF"/>
+        <line x1="120" y1="150" x2="120" y2="80" stroke="#00AEEF" stroke-width="2"/>
+        <text x="120" y="70" text-anchor="middle" font-size="14" font-weight="700" fill="#0E1C33">2010</text>
+        <text x="120" y="50" text-anchor="middle" font-size="11" fill="#6B7A8F">Naissance</text>
+        <text x="120" y="195" text-anchor="middle" font-size="11" fill="#0E1C33">NASA + Rackspace</text>
+        <text x="120" y="210" text-anchor="middle" font-size="11" fill="#0E1C33">Release Austin</text>
+      </g>
+      <g>
+        <circle cx="280" cy="160" r="10" fill="#0057B8"/>
+        <line x1="280" y1="170" x2="280" y2="240" stroke="#0057B8" stroke-width="2"/>
+        <text x="280" y="260" text-anchor="middle" font-size="14" font-weight="700" fill="#0E1C33">2012</text>
+        <text x="280" y="278" text-anchor="middle" font-size="11" fill="#6B7A8F">OpenStack Foundation</text>
+        <text x="280" y="295" text-anchor="middle" font-size="11" fill="#0E1C33">Release Essex</text>
+      </g>
+      <g>
+        <circle cx="440" cy="160" r="10" fill="#00AEEF"/>
+        <line x1="440" y1="150" x2="440" y2="80" stroke="#00AEEF" stroke-width="2"/>
+        <text x="440" y="70" text-anchor="middle" font-size="14" font-weight="700" fill="#0E1C33">2014</text>
+        <text x="440" y="50" text-anchor="middle" font-size="11" fill="#6B7A8F">Adoption massive</text>
+        <text x="440" y="195" text-anchor="middle" font-size="11" fill="#0E1C33">HP, IBM, Red Hat,</text>
+        <text x="440" y="210" text-anchor="middle" font-size="11" fill="#0E1C33">Cisco rejoignent</text>
+      </g>
+      <g>
+        <circle cx="600" cy="160" r="10" fill="#0057B8"/>
+        <line x1="600" y1="170" x2="600" y2="240" stroke="#0057B8" stroke-width="2"/>
+        <text x="600" y="260" text-anchor="middle" font-size="14" font-weight="700" fill="#0E1C33">2018</text>
+        <text x="600" y="278" text-anchor="middle" font-size="11" fill="#6B7A8F">Open Infrastructure</text>
+        <text x="600" y="295" text-anchor="middle" font-size="11" fill="#0E1C33">Foundation</text>
+      </g>
+      <g>
+        <circle cx="760" cy="160" r="10" fill="#00AEEF"/>
+        <line x1="760" y1="150" x2="760" y2="80" stroke="#00AEEF" stroke-width="2"/>
+        <text x="760" y="70" text-anchor="middle" font-size="14" font-weight="700" fill="#0E1C33">2021</text>
+        <text x="760" y="50" text-anchor="middle" font-size="11" fill="#6B7A8F">Maturité</text>
+        <text x="760" y="195" text-anchor="middle" font-size="11" fill="#0E1C33">Release Wallaby,</text>
+        <text x="760" y="210" text-anchor="middle" font-size="11" fill="#0E1C33">Xena, Yoga</text>
+      </g>
+      <g>
+        <circle cx="920" cy="160" r="10" fill="#0057B8"/>
+        <line x1="920" y1="170" x2="920" y2="240" stroke="#0057B8" stroke-width="2"/>
+        <text x="920" y="260" text-anchor="middle" font-size="14" font-weight="700" fill="#0E1C33">2024-25</text>
+        <text x="920" y="278" text-anchor="middle" font-size="11" fill="#6B7A8F">Bobcat, Caracal,</text>
+        <text x="920" y="295" text-anchor="middle" font-size="11" fill="#0E1C33">Dalmatian, Epoxy</text>
+      </g>
+    </svg>
+  </div>
+  <div style="background: var(--light); border-left: 4px solid var(--cyan); padding: 16px 20px; border-radius: 8px; margin-top: 8px;">
+    <p style="margin: 0; font-size: 13px;">
+      <strong>Note nomenclature :</strong> les releases OpenStack suivent un ordre alphabétique avec un nom de code. Cadence de <strong>2 releases majeures par an</strong> (printemps + automne), support upstream limité — d'où l'importance des distributions commerciales (Red Hat, Canonical, Mirantis, SUSE) qui offrent du LTS.
+    </p>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">11 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 12 : ORGANISATION OIF ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">2. Le projet OpenStack</span>
+  <h1>Gouvernance : Open Infrastructure Foundation</h1>
+  <p class="subtitle">Structure indépendante créée pour piloter OpenStack et les projets associés</p>
+  <div class="diagram-container">
+    <svg viewBox="0 0 1100 360" class="diagram">
+      <!-- OIF box -->
+      <rect x="400" y="20" width="300" height="70" rx="10" fill="#0E1C33"/>
+      <text x="550" y="48" text-anchor="middle" fill="white" font-size="16" font-weight="700">Open Infrastructure Foundation</text>
+      <text x="550" y="68" text-anchor="middle" fill="#00AEEF" font-size="12">Organisation à but non lucratif (501c6) — depuis 2012</text>
+      <!-- Lines down -->
+      <line x1="550" y1="90" x2="550" y2="120" stroke="#0E1C33" stroke-width="2"/>
+      <line x1="200" y1="120" x2="900" y2="120" stroke="#0E1C33" stroke-width="2"/>
+      <line x1="200" y1="120" x2="200" y2="150" stroke="#0E1C33" stroke-width="2"/>
+      <line x1="450" y1="120" x2="450" y2="150" stroke="#0E1C33" stroke-width="2"/>
+      <line x1="650" y1="120" x2="650" y2="150" stroke="#0E1C33" stroke-width="2"/>
+      <line x1="900" y1="120" x2="900" y2="150" stroke="#0E1C33" stroke-width="2"/>
+      <!-- Board -->
+      <rect x="100" y="150" width="200" height="80" rx="8" fill="#0057B8"/>
+      <text x="200" y="178" text-anchor="middle" fill="white" font-size="14" font-weight="700">Board of Directors</text>
+      <text x="200" y="200" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="11">24 membres élus</text>
+      <text x="200" y="215" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="11">Stratégie, finances</text>
+      <!-- TC -->
+      <rect x="350" y="150" width="200" height="80" rx="8" fill="#00AEEF"/>
+      <text x="450" y="178" text-anchor="middle" fill="white" font-size="14" font-weight="700">Technical Committee</text>
+      <text x="450" y="200" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="11">Gouvernance technique</text>
+      <text x="450" y="215" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="11">Choix d'architecture</text>
+      <!-- UC -->
+      <rect x="550" y="150" width="200" height="80" rx="8" fill="#0057B8"/>
+      <text x="650" y="178" text-anchor="middle" fill="white" font-size="14" font-weight="700">User Committee</text>
+      <text x="650" y="200" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="11">Représentation</text>
+      <text x="650" y="215" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="11">utilisateurs / opérateurs</text>
+      <!-- Project Teams -->
+      <rect x="800" y="150" width="200" height="80" rx="8" fill="#00AEEF"/>
+      <text x="900" y="178" text-anchor="middle" fill="white" font-size="14" font-weight="700">Project Teams (PTL)</text>
+      <text x="900" y="200" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="11">Nova, Neutron, Swift…</text>
+      <text x="900" y="215" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="11">Élus tous les 6 mois</text>
+      <!-- Sponsors box -->
+      <rect x="200" y="260" width="700" height="80" rx="8" fill="#F5F7FA" stroke="#0E1C33" stroke-width="2"/>
+      <text x="550" y="285" text-anchor="middle" fill="#0E1C33" font-size="14" font-weight="700">Membres et sponsors (Platinum / Gold / Silver)</text>
+      <text x="550" y="308" text-anchor="middle" fill="#0E1C33" font-size="12">Red Hat • Canonical • Huawei • Ant Group • China Mobile • Cisco • Dell • Tencent • OVHcloud • Wind River…</text>
+      <text x="550" y="328" text-anchor="middle" fill="#6B7A8F" font-size="11">Financement, contributions code, gouvernance partagée</text>
+    </svg>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">12 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 13 : CYCLE DE RELEASE ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">2. Le projet OpenStack</span>
+  <h1>Cycle de release et versions</h1>
+  <div class="grid-2" style="margin-top: 16px;">
+    <div>
+      <h3>📅 Cadence semestrielle</h3>
+      <p style="font-size: 14px;">OpenStack publie <strong>2 releases majeures par an</strong>, suivant un cycle de 6 mois fortement coordonné entre tous les projets.</p>
+      <h4 style="margin-top: 16px;">Phases du cycle</h4>
+      <ul style="font-size: 13px;">
+        <li><strong>Planning</strong> — définition des specs et roadmaps</li>
+        <li><strong>Implementation</strong> — milestones M1, M2, M3</li>
+        <li><strong>Feature freeze</strong> — stabilisation</li>
+        <li><strong>Release Candidate</strong> — tests intégration</li>
+        <li><strong>Release</strong> — publication officielle</li>
+      </ul>
+      <h4 style="margin-top: 16px;">Convention de nommage</h4>
+      <p style="font-size: 13px;">Nom de code <strong>alphabétique</strong>, généralement lié à la ville hôte du prochain Summit (puis thèmes plus libres).</p>
+    </div>
+    <div>
+      <h3>🗂️ Releases récentes et à venir</h3>
+      <table>
+        <thead>
+          <tr><th>Nom</th><th>Date</th><th>Statut</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Yoga</td><td>Mars 2022</td><td><span class="pill">EOL</span></td></tr>
+          <tr><td>Zed</td><td>Oct 2022</td><td><span class="pill">EOL</span></td></tr>
+          <tr><td>Antelope</td><td>Mars 2023</td><td><span class="pill orange">Maintained</span></td></tr>
+          <tr><td>Bobcat</td><td>Oct 2023</td><td><span class="pill orange">Maintained</span></td></tr>
+          <tr><td>Caracal</td><td>Avr 2024</td><td><span class="pill green">SLURP</span></td></tr>
+          <tr><td>Dalmatian</td><td>Oct 2024</td><td><span class="pill green">Supported</span></td></tr>
+          <tr><td>Epoxy</td><td>Avr 2025</td><td><span class="pill green">Latest</span></td></tr>
+        </tbody>
+      </table>
+      <p style="font-size: 12px; color: var(--gray); margin-top: 10px;">
+        <strong>SLURP</strong> = Skip Level Upgrade Release Process : upgrade direct d'une SLURP à la suivante.
+      </p>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">13 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 14 : DIVIDER ARCHITECTURE ====================== -->
+<div class="slide divider">
+  <div class="brand-bar"></div>
+  <div class="decorative-circle" style="width: 500px; height: 500px; top: -150px; left: -150px;"></div>
+  <span class="module-tag">Chapitre 3</span>
+  <h1>Architecture<br/>de la plateforme</h1>
+  <p class="subtitle" style="margin-top: 24px;">Vue d'ensemble des briques et de leurs interactions</p>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">14 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 15 : ARCHITECTURE GLOBALE ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">3. Architecture OpenStack</span>
+  <h1>Architecture globale d'OpenStack</h1>
+  <div class="diagram-container">
+    <svg viewBox="0 0 1180 460" class="diagram">
+      <!-- Top: User access layer -->
+      <rect x="40" y="20" width="1100" height="60" rx="8" fill="#0E1C33"/>
+      <text x="590" y="48" text-anchor="middle" fill="white" font-size="15" font-weight="700">Accès utilisateurs</text>
+      <text x="590" y="68" text-anchor="middle" fill="#00AEEF" font-size="12">Horizon (Dashboard Web) • OpenStack CLI • SDK Python/Go • API REST</text>
+
+      <!-- Middle: Keystone identity bus -->
+      <rect x="40" y="100" width="1100" height="50" rx="8" fill="#00AEEF"/>
+      <text x="590" y="130" text-anchor="middle" fill="white" font-size="15" font-weight="700">🔐 Keystone — Identity Service (authentification, tokens, catalogue)</text>
+
+      <!-- Core services -->
+      <g>
+        <rect x="40" y="170" width="200" height="120" rx="8" fill="#0057B8"/>
+        <text x="140" y="200" text-anchor="middle" fill="white" font-size="16" font-weight="700">Nova</text>
+        <text x="140" y="220" text-anchor="middle" fill="#00AEEF" font-size="11">Compute</text>
+        <text x="140" y="245" text-anchor="middle" fill="white" font-size="11">Gestion des VM</text>
+        <text x="140" y="262" text-anchor="middle" fill="white" font-size="11">Scheduling</text>
+        <text x="140" y="279" text-anchor="middle" fill="white" font-size="11">Hyperviseurs</text>
+      </g>
+      <g>
+        <rect x="260" y="170" width="200" height="120" rx="8" fill="#0057B8"/>
+        <text x="360" y="200" text-anchor="middle" fill="white" font-size="16" font-weight="700">Neutron</text>
+        <text x="360" y="220" text-anchor="middle" fill="#00AEEF" font-size="11">Networking</text>
+        <text x="360" y="245" text-anchor="middle" fill="white" font-size="11">Réseaux virtuels</text>
+        <text x="360" y="262" text-anchor="middle" fill="white" font-size="11">Routeurs, LB, FW</text>
+        <text x="360" y="279" text-anchor="middle" fill="white" font-size="11">SDN / OVS / OVN</text>
+      </g>
+      <g>
+        <rect x="480" y="170" width="200" height="120" rx="8" fill="#0057B8"/>
+        <text x="580" y="200" text-anchor="middle" fill="white" font-size="16" font-weight="700">Cinder</text>
+        <text x="580" y="220" text-anchor="middle" fill="#00AEEF" font-size="11">Block Storage</text>
+        <text x="580" y="245" text-anchor="middle" fill="white" font-size="11">Volumes persistants</text>
+        <text x="580" y="262" text-anchor="middle" fill="white" font-size="11">Snapshots</text>
+        <text x="580" y="279" text-anchor="middle" fill="white" font-size="11">Backends (LVM, Ceph…)</text>
+      </g>
+      <g>
+        <rect x="700" y="170" width="200" height="120" rx="8" fill="#0057B8"/>
+        <text x="800" y="200" text-anchor="middle" fill="white" font-size="16" font-weight="700">Swift</text>
+        <text x="800" y="220" text-anchor="middle" fill="#00AEEF" font-size="11">Object Storage</text>
+        <text x="800" y="245" text-anchor="middle" fill="white" font-size="11">Stockage objet S3-like</text>
+        <text x="800" y="262" text-anchor="middle" fill="white" font-size="11">Réplication, durabilité</text>
+        <text x="800" y="279" text-anchor="middle" fill="white" font-size="11">Eventual consistency</text>
+      </g>
+      <g>
+        <rect x="920" y="170" width="200" height="120" rx="8" fill="#0057B8"/>
+        <text x="1020" y="200" text-anchor="middle" fill="white" font-size="16" font-weight="700">Glance</text>
+        <text x="1020" y="220" text-anchor="middle" fill="#00AEEF" font-size="11">Image Service</text>
+        <text x="1020" y="245" text-anchor="middle" fill="white" font-size="11">Catalogue d'images</text>
+        <text x="1020" y="262" text-anchor="middle" fill="white" font-size="11">Formats : QCOW2, RAW…</text>
+        <text x="1020" y="279" text-anchor="middle" fill="white" font-size="11">Métadonnées</text>
+      </g>
+
+      <!-- Optional services -->
+      <g>
+        <rect x="40" y="310" width="260" height="70" rx="8" fill="#F5F7FA" stroke="#0E1C33" stroke-width="2"/>
+        <text x="170" y="335" text-anchor="middle" fill="#0E1C33" font-size="13" font-weight="700">Heat — Orchestration</text>
+        <text x="170" y="357" text-anchor="middle" fill="#6B7A8F" font-size="11">Templates HOT, stacks, autoscaling</text>
+      </g>
+      <g>
+        <rect x="320" y="310" width="260" height="70" rx="8" fill="#F5F7FA" stroke="#0E1C33" stroke-width="2"/>
+        <text x="450" y="335" text-anchor="middle" fill="#0E1C33" font-size="13" font-weight="700">Octavia — Load Balancing</text>
+        <text x="450" y="357" text-anchor="middle" fill="#6B7A8F" font-size="11">LBaaS, Amphora, HA</text>
+      </g>
+      <g>
+        <rect x="600" y="310" width="260" height="70" rx="8" fill="#F5F7FA" stroke="#0E1C33" stroke-width="2"/>
+        <text x="730" y="335" text-anchor="middle" fill="#0E1C33" font-size="13" font-weight="700">Magnum — Containers</text>
+        <text x="730" y="357" text-anchor="middle" fill="#6B7A8F" font-size="11">Kubernetes-as-a-Service</text>
+      </g>
+      <g>
+        <rect x="880" y="310" width="260" height="70" rx="8" fill="#F5F7FA" stroke="#0E1C33" stroke-width="2"/>
+        <text x="1010" y="335" text-anchor="middle" fill="#0E1C33" font-size="13" font-weight="700">Ceilometer / Aodh</text>
+        <text x="1010" y="357" text-anchor="middle" fill="#6B7A8F" font-size="11">Telemetry, métriques, alarmes</text>
+      </g>
+
+      <!-- Infra layer -->
+      <rect x="40" y="400" width="1100" height="50" rx="8" fill="#0E1C33"/>
+      <text x="590" y="425" text-anchor="middle" fill="white" font-size="14" font-weight="700">Infrastructure physique : serveurs, réseau, stockage, hyperviseurs (KVM, ESXi, Hyper-V)</text>
+      <text x="590" y="443" text-anchor="middle" fill="#00AEEF" font-size="11">+ Base de données (MariaDB/Galera) • Message Queue (RabbitMQ) • Memcached</text>
+    </svg>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">15 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 16 : NOVA ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">3. Architecture OpenStack</span>
+  <h1>Nova — Compute Service</h1>
+  <p class="subtitle">Le moteur de calcul d'OpenStack : provisionne et gère les machines virtuelles</p>
+  <div class="grid-2" style="margin-top: 16px;">
+    <div>
+      <h3>🎯 Rôle</h3>
+      <ul style="font-size: 13px;">
+        <li>Provisionner et gérer le cycle de vie des instances (VM, conteneurs LXC, bare-metal via Ironic)</li>
+        <li>Planifier le placement des VM selon des règles (CPU, RAM, anti-affinity)</li>
+        <li>Abstraire les hyperviseurs sous-jacents</li>
+        <li>Exposer une API REST compatible avec Amazon EC2</li>
+      </ul>
+      <h3 style="margin-top: 16px;">🏗️ Composants principaux</h3>
+      <ul style="font-size: 13px;">
+        <li><strong>nova-api</strong> : entrée REST</li>
+        <li><strong>nova-scheduler</strong> : placement des VM</li>
+        <li><strong>nova-conductor</strong> : médiateur DB</li>
+        <li><strong>nova-compute</strong> : exécution sur les nœuds</li>
+        <li><strong>placement</strong> : suivi inventaire ressources</li>
+      </ul>
+    </div>
+    <div>
+      <div class="diagram-container" style="padding: 0;">
+        <svg viewBox="0 0 460 360" class="diagram">
+          <rect x="20" y="20" width="420" height="50" rx="6" fill="#0E1C33"/>
+          <text x="230" y="50" text-anchor="middle" fill="white" font-size="14" font-weight="700">nova-api (REST)</text>
+          <line x1="230" y1="70" x2="230" y2="100" stroke="#0E1C33" stroke-width="2" marker-end="url(#a1)"/>
+          <defs><marker id="a1" markerWidth="10" markerHeight="10" refX="5" refY="9" orient="auto"><polygon points="0,0 5,10 10,0" fill="#0E1C33"/></marker></defs>
+          <rect x="20" y="110" width="420" height="50" rx="6" fill="#0057B8"/>
+          <text x="230" y="140" text-anchor="middle" fill="white" font-size="14" font-weight="700">Message Queue (RabbitMQ)</text>
+          <line x1="120" y1="160" x2="120" y2="190" stroke="#0057B8" stroke-width="2" marker-end="url(#a2)"/>
+          <line x1="340" y1="160" x2="340" y2="190" stroke="#0057B8" stroke-width="2" marker-end="url(#a2)"/>
+          <defs><marker id="a2" markerWidth="10" markerHeight="10" refX="5" refY="9" orient="auto"><polygon points="0,0 5,10 10,0" fill="#0057B8"/></marker></defs>
+          <rect x="20" y="200" width="200" height="50" rx="6" fill="#00AEEF"/>
+          <text x="120" y="230" text-anchor="middle" fill="white" font-size="13" font-weight="700">nova-scheduler</text>
+          <rect x="240" y="200" width="200" height="50" rx="6" fill="#00AEEF"/>
+          <text x="340" y="230" text-anchor="middle" fill="white" font-size="13" font-weight="700">nova-conductor</text>
+          <line x1="120" y1="250" x2="120" y2="280" stroke="#0E1C33" stroke-width="2"/>
+          <line x1="340" y1="250" x2="340" y2="280" stroke="#0E1C33" stroke-width="2"/>
+          <rect x="20" y="290" width="420" height="50" rx="6" fill="#0057B8"/>
+          <text x="230" y="320" text-anchor="middle" fill="white" font-size="14" font-weight="700">nova-compute (sur chaque hyperviseur)</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">16 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 17 : NEUTRON ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">3. Architecture OpenStack</span>
+  <h1>Neutron — Networking</h1>
+  <p class="subtitle">Le SDN d'OpenStack : crée et gère les réseaux virtuels</p>
+  <div class="grid-2" style="margin-top: 16px;">
+    <div>
+      <h3>🎯 Capacités</h3>
+      <ul style="font-size: 13px;">
+        <li>Réseaux <strong>L2 isolés</strong> (VLAN, VXLAN, GENEVE)</li>
+        <li>Sous-réseaux avec DHCP intégré</li>
+        <li><strong>Routeurs virtuels L3</strong> entre réseaux + Internet</li>
+        <li><strong>Floating IPs</strong> (NAT 1:1) pour exposer les VM</li>
+        <li><strong>Security Groups</strong> (firewall stateful)</li>
+        <li>Load Balancer (Octavia), VPN, BGP</li>
+      </ul>
+      <h3 style="margin-top: 16px;">🔌 Plugins / backends</h3>
+      <ul style="font-size: 13px;">
+        <li><strong>ML2</strong> + drivers : Open vSwitch, Linux Bridge, OVN</li>
+        <li>SDN : Cisco ACI, VMware NSX, Calico</li>
+      </ul>
+    </div>
+    <div>
+      <div class="diagram-container" style="padding: 0;">
+        <svg viewBox="0 0 460 360" class="diagram">
+          <!-- External -->
+          <rect x="160" y="20" width="140" height="40" rx="6" fill="#0E1C33"/>
+          <text x="230" y="45" text-anchor="middle" fill="white" font-size="12" font-weight="700">Internet</text>
+          <line x1="230" y1="60" x2="230" y2="90" stroke="#0E1C33" stroke-width="2"/>
+          <!-- Router -->
+          <rect x="140" y="90" width="180" height="50" rx="6" fill="#0057B8"/>
+          <text x="230" y="113" text-anchor="middle" fill="white" font-size="12" font-weight="700">Routeur virtuel L3</text>
+          <text x="230" y="130" text-anchor="middle" fill="#00AEEF" font-size="10">Floating IPs + NAT</text>
+          <line x1="230" y1="140" x2="230" y2="170" stroke="#0057B8" stroke-width="2"/>
+          <!-- Network -->
+          <rect x="20" y="170" width="420" height="180" rx="8" fill="#F5F7FA" stroke="#00AEEF" stroke-width="2" stroke-dasharray="6,3"/>
+          <text x="40" y="195" fill="#0E1C33" font-size="11" font-weight="700">Réseau projet — 192.168.10.0/24</text>
+          <!-- VMs -->
+          <g>
+            <rect x="50" y="220" width="100" height="100" rx="6" fill="#00AEEF"/>
+            <text x="100" y="248" text-anchor="middle" fill="white" font-size="12" font-weight="700">VM-1</text>
+            <text x="100" y="270" text-anchor="middle" fill="white" font-size="10">web</text>
+            <text x="100" y="295" text-anchor="middle" fill="white" font-size="10">.10</text>
+          </g>
+          <g>
+            <rect x="180" y="220" width="100" height="100" rx="6" fill="#00AEEF"/>
+            <text x="230" y="248" text-anchor="middle" fill="white" font-size="12" font-weight="700">VM-2</text>
+            <text x="230" y="270" text-anchor="middle" fill="white" font-size="10">app</text>
+            <text x="230" y="295" text-anchor="middle" fill="white" font-size="10">.20</text>
+          </g>
+          <g>
+            <rect x="310" y="220" width="100" height="100" rx="6" fill="#00AEEF"/>
+            <text x="360" y="248" text-anchor="middle" fill="white" font-size="12" font-weight="700">VM-3</text>
+            <text x="360" y="270" text-anchor="middle" fill="white" font-size="10">db</text>
+            <text x="360" y="295" text-anchor="middle" fill="white" font-size="10">.30</text>
+          </g>
+          <text x="230" y="340" text-anchor="middle" fill="#6B7A8F" font-size="11">Security Groups appliqués sur chaque port</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">17 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 18 : STOCKAGE SWIFT CINDER ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">3. Architecture OpenStack</span>
+  <h1>Stockage : Swift, Cinder et Manila</h1>
+  <p class="subtitle">Trois services pour trois paradigmes de stockage</p>
+  <div class="grid-3" style="margin-top: 16px;">
+    <div class="card cyan">
+      <span class="badge">Object</span>
+      <h3 style="color: var(--blue);">Swift</h3>
+      <p style="font-size: 13px;"><strong>Stockage objet</strong> distribué, accessible via HTTP/REST (API S3-compatible avec Swift3).</p>
+      <h4 style="margin-top: 12px; font-size: 13px;">Caractéristiques</h4>
+      <ul style="font-size: 12px;">
+        <li>Eventual consistency</li>
+        <li>Réplication 3x par défaut</li>
+        <li>Pas de hiérarchie : containers + objets</li>
+        <li>Scalabilité quasi infinie</li>
+      </ul>
+      <h4 style="margin-top: 8px; font-size: 13px;">Cas d'usage</h4>
+      <p style="font-size: 12px;">Backups, photos, vidéos, datasets ML, archives</p>
+    </div>
+    <div class="card">
+      <span class="badge blue">Block</span>
+      <h3 style="color: var(--blue);">Cinder</h3>
+      <p style="font-size: 13px;"><strong>Stockage bloc</strong> persistant : volumes attachables aux VM comme des disques.</p>
+      <h4 style="margin-top: 12px; font-size: 13px;">Caractéristiques</h4>
+      <ul style="font-size: 12px;">
+        <li>Snapshots et clones</li>
+        <li>Quality of Service (QoS)</li>
+        <li>Multi-attach possible</li>
+        <li>40+ backends (Ceph, NetApp, Pure, LVM…)</li>
+      </ul>
+      <h4 style="margin-top: 8px; font-size: 13px;">Cas d'usage</h4>
+      <p style="font-size: 12px;">Disques système, bases de données, datas applicatives</p>
+    </div>
+    <div class="card navy">
+      <span class="badge navy">File</span>
+      <h3 style="color: var(--blue);">Manila</h3>
+      <p style="font-size: 13px;"><strong>Stockage de fichiers</strong> partagé (NFS, CIFS) entre plusieurs instances.</p>
+      <h4 style="margin-top: 12px; font-size: 13px;">Caractéristiques</h4>
+      <ul style="font-size: 12px;">
+        <li>Protocoles NFS, SMB, CephFS</li>
+        <li>Quotas et règles d'accès</li>
+        <li>Shares accessibles concurrent</li>
+        <li>Optionnel mais utile</li>
+      </ul>
+      <h4 style="margin-top: 8px; font-size: 13px;">Cas d'usage</h4>
+      <p style="font-size: 12px;">Partages collaboratifs, codes apps, contenus web</p>
+    </div>
+  </div>
+  <div style="background: var(--light); border-left: 4px solid var(--cyan); padding: 14px 20px; border-radius: 8px; margin-top: 20px;">
+    <p style="margin: 0; font-size: 13px;"><strong>💡 Ceph comme backend unifié :</strong> beaucoup d'opérateurs utilisent <strong>Ceph</strong> (RBD pour Cinder/Glance, RadosGW pour Swift, CephFS pour Manila) — un seul cluster, trois interfaces.</p>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">18 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 19 : GLANCE KEYSTONE HORIZON ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">3. Architecture OpenStack</span>
+  <h1>Services transverses : Glance, Keystone, Horizon</h1>
+  <div class="grid-3" style="margin-top: 16px;">
+    <div>
+      <span class="badge purple">Images</span>
+      <h3>🖼️ Glance</h3>
+      <p style="font-size: 13px;"><strong>Catalogue d'images</strong> de VM utilisables pour démarrer les instances.</p>
+      <h4 style="margin-top: 10px; font-size: 13px;">Formats supportés</h4>
+      <ul style="font-size: 12px;">
+        <li>QCOW2 (KVM, format par défaut)</li>
+        <li>RAW (performance maximale)</li>
+        <li>VHD / VHDX (Hyper-V)</li>
+        <li>VMDK (VMware)</li>
+        <li>AMI / ARI / AKI (compatibilité EC2)</li>
+        <li>ISO (médias d'installation)</li>
+      </ul>
+      <h4 style="margin-top: 10px; font-size: 13px;">Backends de stockage</h4>
+      <p style="font-size: 12px;">Local file system, Swift, Ceph RBD, S3, NFS</p>
+    </div>
+    <div>
+      <span class="badge orange">Identity</span>
+      <h3>🔑 Keystone</h3>
+      <p style="font-size: 13px;"><strong>Authentification</strong>, autorisation et catalogue de services unifié.</p>
+      <h4 style="margin-top: 10px; font-size: 13px;">Concepts clés</h4>
+      <ul style="font-size: 12px;">
+        <li><strong>User</strong> : identité (humain ou service)</li>
+        <li><strong>Project / Tenant</strong> : conteneur de ressources</li>
+        <li><strong>Domain</strong> : namespace de plus haut niveau</li>
+        <li><strong>Role</strong> : permission (admin, member, reader)</li>
+        <li><strong>Token</strong> : jeton d'authentification (UUID, Fernet)</li>
+        <li><strong>Catalog</strong> : liste des endpoints API</li>
+      </ul>
+      <h4 style="margin-top: 10px; font-size: 13px;">Backends</h4>
+      <p style="font-size: 12px;">SQL, LDAP, Active Directory, OIDC/SAML (fédération)</p>
+    </div>
+    <div>
+      <span class="badge green">Web UI</span>
+      <h3>📊 Horizon</h3>
+      <p style="font-size: 13px;"><strong>Dashboard web</strong> Django pour piloter OpenStack sans CLI.</p>
+      <h4 style="margin-top: 10px; font-size: 13px;">Fonctionnalités</h4>
+      <ul style="font-size: 12px;">
+        <li>Gestion VM, volumes, réseaux, images</li>
+        <li>Console VNC/SPICE dans le navigateur</li>
+        <li>Vue admin (hyperviseurs, quotas)</li>
+        <li>Vue projet (mes ressources)</li>
+        <li>Extensible par plugins (panels)</li>
+      </ul>
+      <h4 style="margin-top: 10px; font-size: 13px;">À retenir</h4>
+      <p style="font-size: 12px;">Horizon est un <em>consommateur</em> des APIs : tout ce qu'il fait est faisable en CLI / SDK.</p>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">19 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 20 : FLUX DE COMMUNICATION ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">3. Architecture OpenStack</span>
+  <h1>Flux : création d'une instance Nova</h1>
+  <p class="subtitle">Comprendre comment les briques collaborent à travers un cas concret</p>
+  <div class="diagram-container">
+    <svg viewBox="0 0 1180 380" class="diagram">
+      <!-- Actors -->
+      <rect x="20" y="20" width="120" height="40" rx="6" fill="#0E1C33"/>
+      <text x="80" y="45" text-anchor="middle" fill="white" font-size="12" font-weight="700">Utilisateur</text>
+      <rect x="160" y="20" width="120" height="40" rx="6" fill="#0057B8"/>
+      <text x="220" y="45" text-anchor="middle" fill="white" font-size="12" font-weight="700">Keystone</text>
+      <rect x="300" y="20" width="120" height="40" rx="6" fill="#0057B8"/>
+      <text x="360" y="45" text-anchor="middle" fill="white" font-size="12" font-weight="700">nova-api</text>
+      <rect x="440" y="20" width="120" height="40" rx="6" fill="#00AEEF"/>
+      <text x="500" y="45" text-anchor="middle" fill="white" font-size="12" font-weight="700">Glance</text>
+      <rect x="580" y="20" width="120" height="40" rx="6" fill="#00AEEF"/>
+      <text x="640" y="45" text-anchor="middle" fill="white" font-size="12" font-weight="700">Neutron</text>
+      <rect x="720" y="20" width="120" height="40" rx="6" fill="#00AEEF"/>
+      <text x="780" y="45" text-anchor="middle" fill="white" font-size="12" font-weight="700">Cinder</text>
+      <rect x="860" y="20" width="140" height="40" rx="6" fill="#0057B8"/>
+      <text x="930" y="45" text-anchor="middle" fill="white" font-size="12" font-weight="700">nova-scheduler</text>
+      <rect x="1020" y="20" width="140" height="40" rx="6" fill="#0057B8"/>
+      <text x="1090" y="45" text-anchor="middle" fill="white" font-size="12" font-weight="700">nova-compute</text>
+
+      <!-- Vertical lifelines -->
+      <line x1="80" y1="60" x2="80" y2="370" stroke="#6B7A8F" stroke-dasharray="3,3"/>
+      <line x1="220" y1="60" x2="220" y2="370" stroke="#6B7A8F" stroke-dasharray="3,3"/>
+      <line x1="360" y1="60" x2="360" y2="370" stroke="#6B7A8F" stroke-dasharray="3,3"/>
+      <line x1="500" y1="60" x2="500" y2="370" stroke="#6B7A8F" stroke-dasharray="3,3"/>
+      <line x1="640" y1="60" x2="640" y2="370" stroke="#6B7A8F" stroke-dasharray="3,3"/>
+      <line x1="780" y1="60" x2="780" y2="370" stroke="#6B7A8F" stroke-dasharray="3,3"/>
+      <line x1="930" y1="60" x2="930" y2="370" stroke="#6B7A8F" stroke-dasharray="3,3"/>
+      <line x1="1090" y1="60" x2="1090" y2="370" stroke="#6B7A8F" stroke-dasharray="3,3"/>
+
+      <!-- Messages -->
+      <line x1="80" y1="90" x2="220" y2="90" stroke="#0057B8" stroke-width="2" marker-end="url(#mEnd)"/>
+      <text x="150" y="83" text-anchor="middle" font-size="11" fill="#0E1C33">1. Auth</text>
+      <line x1="220" y1="115" x2="80" y2="115" stroke="#00AEEF" stroke-width="2" stroke-dasharray="4,2" marker-end="url(#mEnd)"/>
+      <text x="150" y="108" text-anchor="middle" font-size="11" fill="#6B7A8F">Token</text>
+
+      <line x1="80" y1="145" x2="360" y2="145" stroke="#0057B8" stroke-width="2" marker-end="url(#mEnd)"/>
+      <text x="220" y="138" text-anchor="middle" font-size="11" fill="#0E1C33">2. POST /servers (+ token)</text>
+
+      <line x1="360" y1="170" x2="500" y2="170" stroke="#0057B8" stroke-width="2" marker-end="url(#mEnd)"/>
+      <text x="430" y="163" text-anchor="middle" font-size="11" fill="#0E1C33">3. Get image</text>
+
+      <line x1="360" y1="195" x2="640" y2="195" stroke="#0057B8" stroke-width="2" marker-end="url(#mEnd)"/>
+      <text x="500" y="188" text-anchor="middle" font-size="11" fill="#0E1C33">4. Allocate port (network)</text>
+
+      <line x1="360" y1="220" x2="780" y2="220" stroke="#0057B8" stroke-width="2" marker-end="url(#mEnd)"/>
+      <text x="570" y="213" text-anchor="middle" font-size="11" fill="#0E1C33">5. Create volume (optionnel)</text>
+
+      <line x1="360" y1="250" x2="930" y2="250" stroke="#0057B8" stroke-width="2" marker-end="url(#mEnd)"/>
+      <text x="640" y="243" text-anchor="middle" font-size="11" fill="#0E1C33">6. Schedule (via Queue)</text>
+
+      <line x1="930" y1="280" x2="1090" y2="280" stroke="#0057B8" stroke-width="2" marker-end="url(#mEnd)"/>
+      <text x="1010" y="273" text-anchor="middle" font-size="11" fill="#0E1C33">7. Build on host</text>
+
+      <line x1="1090" y1="310" x2="80" y2="310" stroke="#00AEEF" stroke-width="2" stroke-dasharray="4,2" marker-end="url(#mEnd)"/>
+      <text x="585" y="303" text-anchor="middle" font-size="11" fill="#6B7A8F">8. État ACTIVE — IP retournée à l'utilisateur</text>
+
+      <defs>
+        <marker id="mEnd" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+          <polygon points="0,0 10,5 0,10" fill="#0057B8"/>
+        </marker>
+      </defs>
+    </svg>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">20 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 21 : DEPENDANCES TECHNIQUES ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">3. Architecture OpenStack</span>
+  <h1>Composants techniques sous-jacents</h1>
+  <p class="subtitle">OpenStack repose sur un écosystème de briques tierces matures</p>
+  <div class="grid-3" style="margin-top: 16px;">
+    <div class="card">
+      <h3>🗄️ Base de données</h3>
+      <p style="font-size: 13px;">Chaque service stocke son état dans une DB SQL.</p>
+      <ul style="font-size: 12px;">
+        <li><strong>MariaDB</strong> (recommandé) en cluster Galera multi-master</li>
+        <li>PostgreSQL également supporté</li>
+        <li>Une base par service (nova, neutron, glance…)</li>
+      </ul>
+    </div>
+    <div class="card cyan">
+      <h3>📨 Message Queue</h3>
+      <p style="font-size: 13px;">Bus de communication asynchrone interne.</p>
+      <ul style="font-size: 12px;">
+        <li><strong>RabbitMQ</strong> (par défaut, AMQP)</li>
+        <li>Qpid, ZeroMQ (alternatives)</li>
+        <li>Permet le découplage des composants</li>
+      </ul>
+    </div>
+    <div class="card navy">
+      <h3>⚡ Cache</h3>
+      <p style="font-size: 13px;">Accélère les opérations Keystone (tokens) et les autres services.</p>
+      <ul style="font-size: 12px;">
+        <li><strong>Memcached</strong> pour les tokens Fernet</li>
+        <li>Redis dans certaines distributions</li>
+      </ul>
+    </div>
+    <div class="card orange">
+      <h3>🌐 Reverse Proxy / Web</h3>
+      <p style="font-size: 13px;">Front HTTP pour les APIs et le dashboard.</p>
+      <ul style="font-size: 12px;">
+        <li><strong>Apache HTTPD</strong> + mod_wsgi (par défaut)</li>
+        <li>Nginx avec uwsgi (déploiements modernes)</li>
+        <li>HAProxy pour la HA des endpoints</li>
+      </ul>
+    </div>
+    <div class="card purple">
+      <h3>🖥️ Hyperviseurs</h3>
+      <p style="font-size: 13px;">Couche d'exécution des VM (driver Nova).</p>
+      <ul style="font-size: 12px;">
+        <li><strong>KVM / QEMU</strong> (par défaut, Linux)</li>
+        <li>VMware ESXi (vCenter)</li>
+        <li>Hyper-V, LXC, Xen, Ironic (bare-metal)</li>
+      </ul>
+    </div>
+    <div class="card green">
+      <h3>🔐 Identity backends</h3>
+      <p style="font-size: 13px;">Sources d'identité pour Keystone.</p>
+      <ul style="font-size: 12px;">
+        <li>SQL (interne, le plus courant)</li>
+        <li>LDAP / Active Directory</li>
+        <li>SAML / OpenID Connect (fédération)</li>
+      </ul>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">21 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 22 : DIVIDER INSTALLATION ====================== -->
+<div class="slide divider">
+  <div class="brand-bar"></div>
+  <div class="decorative-circle" style="width: 500px; height: 500px; bottom: -150px; right: -150px;"></div>
+  <span class="module-tag">Chapitre 4</span>
+  <h1>Méthodes<br/>d'installation</h1>
+  <p class="subtitle" style="margin-top: 24px;">Comment déployer OpenStack en production ou en lab ?</p>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">22 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 23 : METHODES D'INSTALLATION ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">4. Méthodes d'installation</span>
+  <h1>Panorama des méthodes d'installation</h1>
+  <p class="subtitle">Choisir la bonne méthode selon l'objectif : lab, POC, production</p>
+  <div style="flex: 1; overflow: auto;">
+    <table style="margin-top: 8px;">
+      <thead>
+        <tr>
+          <th>Méthode</th>
+          <th>Type</th>
+          <th>Usage</th>
+          <th>Effort</th>
+          <th>Production</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>DevStack</strong></td>
+          <td>Scripts shell</td>
+          <td>Dev, tests upstream, formation</td>
+          <td>⭐ Très simple</td>
+          <td><span class="cross">✗ Non</span></td>
+        </tr>
+        <tr>
+          <td><strong>PackStack</strong></td>
+          <td>Puppet (RHEL/CentOS)</td>
+          <td>POC, petites infras RDO</td>
+          <td>⭐⭐ Simple</td>
+          <td><span class="cross">✗ Limité</span></td>
+        </tr>
+        <tr>
+          <td><strong>Kolla-Ansible</strong></td>
+          <td>Containers Docker + Ansible</td>
+          <td>Production, multi-nœuds, HA</td>
+          <td>⭐⭐⭐ Moyen</td>
+          <td><span class="check">✓ Oui</span></td>
+        </tr>
+        <tr>
+          <td><strong>OpenStack-Ansible (OSA)</strong></td>
+          <td>LXC + Ansible</td>
+          <td>Production, contrôle fin</td>
+          <td>⭐⭐⭐⭐ Avancé</td>
+          <td><span class="check">✓ Oui</span></td>
+        </tr>
+        <tr>
+          <td><strong>TripleO</strong></td>
+          <td>OpenStack-on-OpenStack (Heat)</td>
+          <td>Red Hat OSP, infras complexes</td>
+          <td>⭐⭐⭐⭐⭐ Expert</td>
+          <td><span class="check">✓ Oui (entreprise)</span></td>
+        </tr>
+        <tr>
+          <td><strong>Juju + MAAS</strong></td>
+          <td>Charms (Canonical)</td>
+          <td>Production, écosystème Ubuntu</td>
+          <td>⭐⭐⭐ Moyen</td>
+          <td><span class="check">✓ Oui</span></td>
+        </tr>
+        <tr>
+          <td><strong>MicroStack / Sunbeam</strong></td>
+          <td>Snaps (Canonical)</td>
+          <td>Single-node, edge, dev</td>
+          <td>⭐ Très simple</td>
+          <td><span class="cross">~ Edge uniquement</span></td>
+        </tr>
+        <tr>
+          <td><strong>Distributions commerciales</strong></td>
+          <td>Red Hat OSP, Mirantis, SUSE</td>
+          <td>Entreprise avec support</td>
+          <td>⭐⭐⭐ Moyen</td>
+          <td><span class="check">✓ Oui + support</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">23 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 24 : DEVSTACK ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">4. Méthodes d'installation</span>
+  <h1>DevStack — pour apprendre et développer</h1>
+  <div class="grid-2" style="margin-top: 16px;">
+    <div>
+      <h3>🎯 Pourquoi DevStack ?</h3>
+      <ul style="font-size: 13px;">
+        <li>Installation <strong>tout-en-un</strong> sur 1 VM ou 1 serveur</li>
+        <li>Idéal pour <strong>formation</strong>, contribution upstream, démos</li>
+        <li>Active la <strong>dernière version</strong> en cours de développement (master)</li>
+        <li>Configurable via un fichier <code>local.conf</code></li>
+      </ul>
+      <h3 style="margin-top: 16px;">⚠️ Limites</h3>
+      <ul style="font-size: 13px;">
+        <li>Pas de Haute Disponibilité</li>
+        <li>État perdu au reboot par défaut</li>
+        <li>Performances limitées</li>
+        <li>Jamais à utiliser en production</li>
+      </ul>
+      <h3 style="margin-top: 16px;">📋 Prérequis</h3>
+      <p style="font-size: 13px;">Ubuntu 22.04 ou Rocky 9 minimum, 8 Go RAM, 60 Go disque, accès root et Internet.</p>
+    </div>
+    <div>
+      <h3>💻 Procédure</h3>
+      <pre class="code"><span class="cm"># 1. Créer un user dédié</span>
+<span class="kw">sudo</span> useradd -s /bin/bash -d /opt/stack -m stack
+<span class="kw">echo</span> <span class="str">"stack ALL=(ALL) NOPASSWD: ALL"</span> | \
+  <span class="kw">sudo</span> tee /etc/sudoers.d/stack
+<span class="kw">sudo</span> su - stack
+
+<span class="cm"># 2. Cloner le repo</span>
+<span class="kw">git</span> clone https://opendev.org/openstack/devstack
+<span class="kw">cd</span> devstack
+
+<span class="cm"># 3. Créer local.conf</span>
+<span class="kw">cat</span> &gt; local.conf &lt;&lt;EOF
+[[local|localrc]]
+ADMIN_PASSWORD=secret
+DATABASE_PASSWORD=\$ADMIN_PASSWORD
+RABBIT_PASSWORD=\$ADMIN_PASSWORD
+SERVICE_PASSWORD=\$ADMIN_PASSWORD
+HOST_IP=10.0.0.10
+EOF
+
+<span class="cm"># 4. Lancer le déploiement</span>
+./stack.sh
+
+<span class="cm"># ⏱️ ~30-45 min selon la machine</span>
+<span class="cm"># Dashboard : http://10.0.0.10/dashboard</span></pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">24 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 25 : KOLLA-ANSIBLE ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">4. Méthodes d'installation</span>
+  <h1>Kolla-Ansible — la voie production moderne</h1>
+  <div class="grid-2" style="margin-top: 16px;">
+    <div>
+      <h3>🚀 Principe</h3>
+      <p style="font-size: 13px;">Tous les services OpenStack sont packagés en <strong>conteneurs Docker</strong>. Le déploiement est orchestré par <strong>Ansible</strong> sur l'ensemble des nœuds.</p>
+      <h3 style="margin-top: 14px;">✅ Avantages</h3>
+      <ul style="font-size: 13px;">
+        <li><strong>Isolation</strong> : chaque service dans son conteneur</li>
+        <li><strong>Upgrades atomiques</strong> : on remplace l'image</li>
+        <li><strong>Rollback</strong> facile en cas d'échec</li>
+        <li><strong>HA native</strong> : HAProxy + Keepalived + Galera</li>
+        <li>Compatible Docker, Podman</li>
+        <li>Documentation très active</li>
+      </ul>
+      <h3 style="margin-top: 14px;">🏗️ Topologie type</h3>
+      <ul style="font-size: 13px;">
+        <li>3 nœuds <em>control</em> (HA)</li>
+        <li>N nœuds <em>compute</em></li>
+        <li>3 nœuds <em>storage</em> (Ceph)</li>
+        <li>2 nœuds <em>network</em> (optionnel)</li>
+      </ul>
+    </div>
+    <div>
+      <h3>💻 Workflow</h3>
+      <pre class="code"><span class="cm"># 1. Installer Kolla-Ansible</span>
+<span class="kw">pip</span> install kolla-ansible
+
+<span class="cm"># 2. Préparer la config</span>
+<span class="kw">sudo</span> mkdir -p /etc/kolla
+<span class="kw">cp</span> -r kolla-ansible/etc_examples/kolla/* \
+       /etc/kolla/
+
+<span class="cm"># 3. Éditer globals.yml</span>
+<span class="kw">cat</span> &gt;&gt; /etc/kolla/globals.yml &lt;&lt;EOF
+kolla_base_distro: <span class="str">"rocky"</span>
+openstack_release: <span class="str">"2024.1"</span>
+kolla_internal_vip_address: <span class="str">"10.0.0.250"</span>
+network_interface: <span class="str">"eth0"</span>
+neutron_external_interface: <span class="str">"eth1"</span>
+enable_cinder: <span class="str">"yes"</span>
+enable_ceph: <span class="str">"yes"</span>
+EOF
+
+<span class="cm"># 4. Générer les mots de passe</span>
+kolla-genpwd
+
+<span class="cm"># 5. Bootstrap des serveurs</span>
+kolla-ansible bootstrap-servers \
+  -i multinode
+
+<span class="cm"># 6. Pre-checks + deploy</span>
+kolla-ansible prechecks -i multinode
+kolla-ansible deploy    -i multinode
+kolla-ansible post-deploy -i multinode</pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">25 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 26 : COMPARAISON METHODES ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">4. Méthodes d'installation</span>
+  <h1>Comment choisir sa méthode ?</h1>
+  <div class="diagram-container">
+    <svg viewBox="0 0 1180 380" class="diagram">
+      <!-- Decision tree -->
+      <rect x="490" y="20" width="200" height="50" rx="8" fill="#0E1C33"/>
+      <text x="590" y="50" text-anchor="middle" fill="white" font-size="14" font-weight="700">Quel besoin ?</text>
+
+      <!-- Branch 1: Dev/Lab -->
+      <line x1="590" y1="70" x2="200" y2="120" stroke="#0E1C33" stroke-width="2"/>
+      <rect x="100" y="120" width="200" height="50" rx="8" fill="#0057B8"/>
+      <text x="200" y="148" text-anchor="middle" fill="white" font-size="13" font-weight="700">Apprentissage / Dev</text>
+      <line x1="200" y1="170" x2="200" y2="200" stroke="#0057B8" stroke-width="2" marker-end="url(#ar)"/>
+      <rect x="60" y="210" width="280" height="60" rx="8" fill="#00AEEF"/>
+      <text x="200" y="235" text-anchor="middle" fill="white" font-size="13" font-weight="700">DevStack</text>
+      <text x="200" y="255" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="11">single-node, dernier code upstream</text>
+
+      <!-- Branch 2: POC -->
+      <line x1="590" y1="70" x2="590" y2="120" stroke="#0E1C33" stroke-width="2"/>
+      <rect x="490" y="120" width="200" height="50" rx="8" fill="#0057B8"/>
+      <text x="590" y="148" text-anchor="middle" fill="white" font-size="13" font-weight="700">POC / Petit projet</text>
+      <line x1="590" y1="170" x2="590" y2="200" stroke="#0057B8" stroke-width="2" marker-end="url(#ar)"/>
+      <rect x="450" y="210" width="280" height="60" rx="8" fill="#00AEEF"/>
+      <text x="590" y="235" text-anchor="middle" fill="white" font-size="13" font-weight="700">PackStack ou MicroStack</text>
+      <text x="590" y="255" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="11">simple, all-in-one ou small cluster</text>
+
+      <!-- Branch 3: Prod -->
+      <line x1="590" y1="70" x2="980" y2="120" stroke="#0E1C33" stroke-width="2"/>
+      <rect x="880" y="120" width="200" height="50" rx="8" fill="#0057B8"/>
+      <text x="980" y="148" text-anchor="middle" fill="white" font-size="13" font-weight="700">Production / HA</text>
+      <line x1="980" y1="170" x2="980" y2="200" stroke="#0057B8" stroke-width="2" marker-end="url(#ar)"/>
+      <rect x="840" y="210" width="280" height="60" rx="8" fill="#00AEEF"/>
+      <text x="980" y="232" text-anchor="middle" fill="white" font-size="13" font-weight="700">Kolla-Ansible / OSA</text>
+      <text x="980" y="250" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="11">multi-nœuds, HA, upgrades maîtrisés</text>
+
+      <!-- Bottom: Enterprise -->
+      <rect x="350" y="300" width="480" height="60" rx="8" fill="#0E1C33"/>
+      <text x="590" y="325" text-anchor="middle" fill="white" font-size="13" font-weight="700">Entreprise + support 24/7</text>
+      <text x="590" y="345" text-anchor="middle" fill="#00AEEF" font-size="11">Red Hat OpenStack Platform • Canonical Charmed • Mirantis • SUSE</text>
+
+      <defs>
+        <marker id="ar" markerWidth="10" markerHeight="10" refX="5" refY="9" orient="auto">
+          <polygon points="0,0 5,10 10,0" fill="#0057B8"/>
+        </marker>
+      </defs>
+    </svg>
+  </div>
+  <div style="background: var(--light); border-left: 4px solid var(--cyan); padding: 14px 20px; border-radius: 8px;">
+    <p style="margin: 0; font-size: 13px;"><strong>💡 Critères de décision :</strong> taille (1 vs N nœuds), HA requise, expertise interne (Ansible, Docker, Puppet), besoin de support contractuel, OS de la flotte, intégration matériel (Ceph, NetApp…).</p>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">26 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 27 : DISTRIBUTIONS COMMERCIALES ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">4. Méthodes d'installation</span>
+  <h1>Distributions commerciales</h1>
+  <p class="subtitle">Pour qui veut du support contractuel et un cycle long-term</p>
+  <div class="grid-2" style="margin-top: 16px;">
+    <div class="card">
+      <h3>🎩 Red Hat OpenStack Platform (RHOSP / RHOSO)</h3>
+      <ul style="font-size: 13px;">
+        <li>Basé sur <strong>RDO</strong> (upstream Red Hat)</li>
+        <li>Installer : <strong>TripleO / Director</strong>, puis OpenStack on OpenShift</li>
+        <li>Support entreprise jusqu'à <strong>5-7 ans</strong></li>
+        <li>Intégration RHEL, Ceph, Ansible, OpenShift</li>
+        <li>Cibles : grandes entreprises, telcos (NFV)</li>
+      </ul>
+    </div>
+    <div class="card cyan">
+      <h3>🟠 Canonical Charmed OpenStack</h3>
+      <ul style="font-size: 13px;">
+        <li>Basé sur <strong>Ubuntu Server LTS</strong></li>
+        <li>Déploiement via <strong>Juju + MAAS</strong> (bare-metal as a service)</li>
+        <li>Modèle <em>everything as a charm</em></li>
+        <li>Sunbeam pour les petits déploiements</li>
+        <li>Cibles : opérateurs cloud, telcos, edge</li>
+      </ul>
+    </div>
+    <div class="card navy">
+      <h3>🌊 Mirantis OpenStack for Kubernetes (MOSK)</h3>
+      <ul style="font-size: 13px;">
+        <li>OpenStack déployé <strong>sur Kubernetes</strong></li>
+        <li>Opérateurs et CRD natifs Kubernetes</li>
+        <li>Cycle de vie continu</li>
+        <li>Intégré avec Mirantis Container Cloud</li>
+      </ul>
+    </div>
+    <div class="card orange">
+      <h3>🦎 SUSE / Rancher / autres</h3>
+      <ul style="font-size: 13px;">
+        <li><strong>SUSE OpenStack Cloud</strong> (anciennement)</li>
+        <li>Solutions chinoises : <strong>Huawei FusionSphere</strong>, <strong>Inspur</strong></li>
+        <li>Wind River Cloud Platform (edge / telco)</li>
+        <li>Stratus, Platform9 (OpenStack-as-a-Service)</li>
+      </ul>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">27 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 28 : PREREQUIS & TOPOLOGIE LAB ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">4. Méthodes d'installation</span>
+  <h1>Prérequis et topologie pour le TP</h1>
+  <div class="grid-2" style="margin-top: 16px;">
+    <div>
+      <h3>🖥️ Matériel minimum (DevStack lab)</h3>
+      <ul style="font-size: 13px;">
+        <li>CPU : 4 vCPU (8+ recommandé)</li>
+        <li>RAM : 8 Go minimum, <strong>16 Go conseillé</strong></li>
+        <li>Disque : 60 Go SSD</li>
+        <li>OS : Ubuntu 22.04 ou Rocky Linux 9</li>
+        <li>Connexion Internet (Git, pip, repositories)</li>
+        <li>Virtualisation imbriquée si VM (KVM nested ou support hyperviseur)</li>
+      </ul>
+      <h3 style="margin-top: 14px;">🔧 Prérequis logiciels</h3>
+      <ul style="font-size: 13px;">
+        <li>Utilisateur dédié avec <code>sudo</code> NOPASSWD</li>
+        <li>Pas de Docker / Podman préinstallés conflictuels</li>
+        <li>Pare-feu désactivé ou ports ouverts (80, 443, 5000, 6080, 8774…)</li>
+        <li>SELinux en permissive (sur RHEL family)</li>
+      </ul>
+    </div>
+    <div>
+      <h3>🌐 Topologie réseau cible</h3>
+      <div class="diagram-container" style="padding: 0;">
+        <svg viewBox="0 0 480 280" class="diagram">
+          <!-- Cloud -->
+          <ellipse cx="240" cy="40" rx="80" ry="22" fill="#0E1C33"/>
+          <text x="240" y="46" text-anchor="middle" fill="white" font-size="13" font-weight="700">Internet</text>
+          <line x1="240" y1="62" x2="240" y2="90" stroke="#0E1C33" stroke-width="2"/>
+          <!-- Host -->
+          <rect x="60" y="90" width="360" height="180" rx="10" fill="#F5F7FA" stroke="#0E1C33" stroke-width="2"/>
+          <text x="240" y="115" text-anchor="middle" fill="#0E1C33" font-size="12" font-weight="700">Serveur DevStack (eth0 = 192.168.1.50)</text>
+          <!-- Services boxes -->
+          <rect x="80" y="135" width="100" height="50" rx="6" fill="#0057B8"/>
+          <text x="130" y="160" text-anchor="middle" fill="white" font-size="11" font-weight="700">Keystone</text>
+          <text x="130" y="175" text-anchor="middle" fill="white" font-size="10">:5000</text>
+          <rect x="190" y="135" width="100" height="50" rx="6" fill="#0057B8"/>
+          <text x="240" y="160" text-anchor="middle" fill="white" font-size="11" font-weight="700">Nova</text>
+          <text x="240" y="175" text-anchor="middle" fill="white" font-size="10">:8774</text>
+          <rect x="300" y="135" width="100" height="50" rx="6" fill="#0057B8"/>
+          <text x="350" y="160" text-anchor="middle" fill="white" font-size="11" font-weight="700">Neutron</text>
+          <text x="350" y="175" text-anchor="middle" fill="white" font-size="10">:9696</text>
+          <rect x="80" y="195" width="100" height="50" rx="6" fill="#00AEEF"/>
+          <text x="130" y="220" text-anchor="middle" fill="white" font-size="11" font-weight="700">Glance</text>
+          <text x="130" y="235" text-anchor="middle" fill="white" font-size="10">:9292</text>
+          <rect x="190" y="195" width="100" height="50" rx="6" fill="#00AEEF"/>
+          <text x="240" y="220" text-anchor="middle" fill="white" font-size="11" font-weight="700">Cinder</text>
+          <text x="240" y="235" text-anchor="middle" fill="white" font-size="10">:8776</text>
+          <rect x="300" y="195" width="100" height="50" rx="6" fill="#00AEEF"/>
+          <text x="350" y="220" text-anchor="middle" fill="white" font-size="11" font-weight="700">Horizon</text>
+          <text x="350" y="235" text-anchor="middle" fill="white" font-size="10">:80</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">28 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 29 : TP ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">Travaux pratiques</span>
+  <h1>TP : Installation de DevStack</h1>
+  <p class="subtitle">Comparer les méthodes d'installation et déployer un OpenStack fonctionnel</p>
+  <div class="grid-2" style="margin-top: 16px;">
+    <div>
+      <h3>🎯 Objectifs</h3>
+      <ul style="font-size: 13px;">
+        <li>Comprendre les différences DevStack / PackStack / Kolla-Ansible</li>
+        <li>Justifier le choix de DevStack pour un lab</li>
+        <li>Préparer un serveur Ubuntu 22.04</li>
+        <li>Installer DevStack avec un <code>local.conf</code> custom</li>
+        <li>Vérifier les endpoints Keystone</li>
+        <li>Se connecter à Horizon et identifier les briques actives</li>
+      </ul>
+      <h3 style="margin-top: 14px;">⏱️ Durée : 1h30</h3>
+    </div>
+    <div>
+      <h3>📋 Étapes</h3>
+      <ol style="font-size: 13px; padding-left: 20px;">
+        <li style="margin-bottom: 6px;"><strong>Préparer</strong> une VM Ubuntu 22.04 (16 Go RAM, 60 Go disque, nested virt activé)</li>
+        <li style="margin-bottom: 6px;"><strong>Créer</strong> l'utilisateur <code>stack</code> et son sudo</li>
+        <li style="margin-bottom: 6px;"><strong>Cloner</strong> le dépôt DevStack (branche stable/2024.1)</li>
+        <li style="margin-bottom: 6px;"><strong>Rédiger</strong> un <code>local.conf</code> activant Nova, Neutron, Cinder, Glance, Keystone, Horizon</li>
+        <li style="margin-bottom: 6px;"><strong>Lancer</strong> <code>./stack.sh</code> et observer les logs</li>
+        <li style="margin-bottom: 6px;"><strong>Sourcer</strong> <code>openrc</code> et tester avec <code>openstack endpoint list</code></li>
+        <li style="margin-bottom: 6px;"><strong>Accéder</strong> à Horizon, créer un projet et un user</li>
+        <li><strong>Documenter</strong> les différences observées avec PackStack (lecture comparée)</li>
+      </ol>
+      <div style="background: var(--navy); color: var(--white); padding: 12px 16px; border-radius: 8px; margin-top: 12px;">
+        <p style="font-size: 12px; margin: 0; color: var(--white);"><strong style="color: var(--cyan);">Livrable :</strong> capture d'écran du dashboard Horizon + sortie de <code>openstack service list</code></p>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 1</div>
+  <div class="slide-number">29 / 30</div>
+</div>
+
+<!-- ====================== SLIDE 30 : RECAP ====================== -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">Récapitulatif</span>
+  <h1>Ce que vous avez appris</h1>
+  <div class="grid-2" style="margin-top: 16px;">
+    <div>
+      <div class="card cyan" style="margin-bottom: 12px;">
+        <h4><span class="num cyan">1</span>Cloud Computing</h4>
+        <p style="font-size: 12px; margin-left: 42px;">Les 5 caractéristiques NIST, IaaS/PaaS/SaaS, modèles publics/privés/hybrides</p>
+      </div>
+      <div class="card" style="margin-bottom: 12px;">
+        <h4><span class="num">2</span>Projet OpenStack</h4>
+        <p style="font-size: 12px; margin-left: 42px;">Open Infrastructure Foundation, gouvernance, releases semestrielles, communauté</p>
+      </div>
+      <div class="card navy" style="margin-bottom: 12px;">
+        <h4><span class="num navy">3</span>Architecture</h4>
+        <p style="font-size: 12px; margin-left: 42px;">Nova, Neutron, Cinder, Swift, Glance, Keystone, Horizon — services et flux</p>
+      </div>
+      <div class="card orange">
+        <h4><span class="num" style="background: var(--orange);">4</span>Installation</h4>
+        <p style="font-size: 12px; margin-left: 42px;">DevStack, PackStack, Kolla-Ansible, OpenStack-Ansible, distributions commerciales</p>
+      </div>
+    </div>
+    <div>
+      <h3>📚 Pour aller plus loin</h3>
+      <ul style="font-size: 13px;">
+        <li><strong>docs.openstack.org</strong> — documentation officielle</li>
+        <li><strong>opendev.org</strong> — code source et reviews Gerrit</li>
+        <li><strong>governance.openstack.org</strong> — gouvernance, projets et TC</li>
+        <li><strong>OpenInfra Live</strong> — webinaires hebdomadaires</li>
+        <li><strong>OpenInfra Summit</strong> — conférence annuelle</li>
+      </ul>
+      <h3 style="margin-top: 16px;">➡️ Prochain module</h3>
+      <div style="background: linear-gradient(135deg, var(--blue), var(--cyan)); color: var(--white); padding: 18px 22px; border-radius: 12px;">
+        <span style="font-size: 11px; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px;">Module 2 / 7</span>
+        <h4 style="color: var(--white); margin-top: 4px; margin-bottom: 6px; font-size: 18px;">Gestion des machines virtuelles</h4>
+        <p style="font-size: 12px; margin: 0; color: rgba(255,255,255,0.95);">Nova en profondeur, hyperviseurs multiples (KVM, Hyper-V, ESXi), création d'instances, configuration réseau virtuel.</p>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 1 — Fin</div>
+  <div class="slide-number">30 / 30</div>
+</div>
+
+<div class="controls" id="controls">
+  <button class="ctrl-btn" id="btnFirst" title="Première (Home)">⏮</button>
+  <button class="ctrl-btn" id="btnPrev" title="Précédent (←)">←</button>
+  <div class="ctrl-counter">
+    <input type="number" id="slideInput" min="1" value="1"> / <span id="totalSlides">30</span>
+  </div>
+  <button class="ctrl-btn" id="btnNext" title="Suivant (→ ou Espace)">→</button>
+  <button class="ctrl-btn" id="btnLast" title="Dernière (End)">⏭</button>
+  <button class="ctrl-btn" id="btnOverview" title="Vue d'ensemble (O)">▦</button>
+  <button class="ctrl-btn" id="btnFullscreen" title="Plein écran (F)">⛶</button>
+</div>
+</div>
+
+<script>
+(function() {
+  const deck = document.getElementById('deck');
+  const slides = Array.from(deck.querySelectorAll('.slide'));
+  const total = slides.length;
+  const progress = document.getElementById('progress');
+  const slideInput = document.getElementById('slideInput');
+  const totalSpan = document.getElementById('totalSlides');
+  const controls = document.getElementById('controls');
+  const hint = document.getElementById('hint');
+
+  totalSpan.textContent = total;
+  slideInput.max = total;
+
+  let current = 0;
+  let overview = false;
+
+  // Lire l'index depuis le hash de l'URL
+  function indexFromHash() {
+    const m = location.hash.match(/^#\/(\d+)$/);
+    if (m) {
+      const i = parseInt(m[1], 10) - 1;
+      if (i >= 0 && i < total) return i;
+    }
+    return 0;
+  }
+
+  function render() {
+    slides.forEach((s, i) => s.classList.toggle('active', i === current));
+    progress.style.width = ((current + 1) / total * 100) + '%';
+    slideInput.value = current + 1;
+    document.getElementById('btnPrev').disabled = current === 0;
+    document.getElementById('btnFirst').disabled = current === 0;
+    document.getElementById('btnNext').disabled = current === total - 1;
+    document.getElementById('btnLast').disabled = current === total - 1;
+    location.hash = '#/' + (current + 1);
+  }
+
+  function goto(i) {
+    if (i < 0) i = 0;
+    if (i >= total) i = total - 1;
+    current = i;
+    render();
+  }
+
+  function next() { goto(current + 1); }
+  function prev() { goto(current - 1); }
+
+  // Vue d'ensemble
+  function toggleOverview() {
+    overview = !overview;
+    deck.classList.toggle('overview', overview);
+    if (overview) {
+      slides.forEach((s, i) => {
+        s.onclick = () => {
+          overview = false;
+          deck.classList.remove('overview');
+          slides.forEach(sl => sl.onclick = null);
+          goto(i);
+          // scroll back to top
+          window.scrollTo(0, 0);
+        };
+      });
+    } else {
+      slides.forEach(s => s.onclick = null);
+      window.scrollTo(0, 0);
+    }
+  }
+
+  // Fullscreen
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.();
+    } else {
+      document.exitFullscreen?.();
+    }
+  }
+
+  // Clavier
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+    switch (e.key) {
+      case 'ArrowRight':
+      case 'PageDown':
+      case ' ':
+        e.preventDefault(); next(); break;
+      case 'ArrowLeft':
+      case 'PageUp':
+        e.preventDefault(); prev(); break;
+      case 'Home':
+        e.preventDefault(); goto(0); break;
+      case 'End':
+        e.preventDefault(); goto(total - 1); break;
+      case 'f':
+      case 'F':
+        e.preventDefault(); toggleFullscreen(); break;
+      case 'o':
+      case 'O':
+      case 'Escape':
+        if (e.key === 'Escape' && !overview) break;
+        e.preventDefault(); toggleOverview(); break;
+    }
+  });
+
+  // Clic sur la slide pour avancer (sauf si on est en overview ou sur un lien)
+  deck.addEventListener('click', (e) => {
+    if (overview) return;
+    if (e.target.closest('.controls') || e.target.closest('a') || e.target.closest('button') || e.target.closest('input')) return;
+    // Clic à gauche -> précédent, droite -> suivant
+    const rect = deck.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    if (x < rect.width * 0.3) prev();
+    else next();
+  });
+
+  // Touch (swipe)
+  let touchStartX = 0;
+  deck.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+  }, { passive: true });
+  deck.addEventListener('touchend', (e) => {
+    if (overview) return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 50) {
+      if (dx < 0) next(); else prev();
+    }
+  }, { passive: true });
+
+  // Boutons
+  document.getElementById('btnPrev').addEventListener('click', prev);
+  document.getElementById('btnNext').addEventListener('click', next);
+  document.getElementById('btnFirst').addEventListener('click', () => goto(0));
+  document.getElementById('btnLast').addEventListener('click', () => goto(total - 1));
+  document.getElementById('btnOverview').addEventListener('click', toggleOverview);
+  document.getElementById('btnFullscreen').addEventListener('click', toggleFullscreen);
+
+  slideInput.addEventListener('change', () => {
+    goto(parseInt(slideInput.value, 10) - 1);
+  });
+  slideInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      slideInput.blur();
+    }
+  });
+
+  // Hash navigation
+  window.addEventListener('hashchange', () => {
+    const i = indexFromHash();
+    if (i !== current) goto(i);
+  });
+
+  // Démarrage
+  current = indexFromHash();
+  render();
+
+  // Afficher le hint pendant 4s
+  hint.classList.add('show');
+  setTimeout(() => hint.classList.remove('show'), 4000);
+})();
+</script>
+</body>
+</html>

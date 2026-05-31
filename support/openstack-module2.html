@@ -1,0 +1,2751 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 2 — Gestion des machines virtuelles (Nova)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0E1C33;
+    --blue: #0057B8;
+    --cyan: #00AEEF;
+    --light: #F5F7FA;
+    --white: #FFFFFF;
+    --gray: #6B7A8F;
+    --gray-light: #E5EAF0;
+    --green: #10B981;
+    --orange: #F59E0B;
+    --red: #EF4444;
+    --purple: #8B5CF6;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: #000;
+    color: var(--navy);
+    line-height: 1.5;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+  }
+  .deck {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+    overflow: hidden;
+  }
+  .slide {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.96);
+    width: min(92vw, calc(92vh * 16 / 9));
+    height: min(92vh, calc(92vw * 9 / 16));
+    aspect-ratio: 16 / 9;
+    background: var(--white);
+    border-radius: 16px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+    padding: 3.5% 4.5%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.45s ease, transform 0.45s ease;
+  }
+  .slide.active {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    pointer-events: auto;
+  }
+  .slide-number {
+    position: absolute;
+    bottom: 24px;
+    right: 32px;
+    font-size: 13px;
+    color: var(--gray);
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .brand-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 6px;
+    background: linear-gradient(90deg, var(--navy) 0%, var(--blue) 50%, var(--cyan) 100%);
+  }
+  .brand-tag {
+    position: absolute;
+    bottom: 24px;
+    left: 32px;
+    font-size: 12px;
+    color: var(--gray);
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  h1 { font-size: 38px; font-weight: 800; color: var(--navy); line-height: 1.15; margin-bottom: 14px; }
+  h2 { font-size: 28px; font-weight: 700; color: var(--navy); margin-bottom: 20px; line-height: 1.2; }
+  h3 { font-size: 18px; font-weight: 700; color: var(--blue); margin-bottom: 10px; }
+  h4 { font-size: 14px; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
+  p { font-size: 14px; color: var(--navy); margin-bottom: 10px; }
+  .subtitle { font-size: 16px; color: var(--gray); font-weight: 400; margin-bottom: 18px; }
+  ul { list-style: none; }
+  li {
+    font-size: 13px;
+    padding: 4px 0 4px 22px;
+    position: relative;
+    color: var(--navy);
+    line-height: 1.45;
+  }
+  li::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 12px;
+    width: 7px; height: 7px;
+    background: var(--cyan);
+    border-radius: 50%;
+  }
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--gray-light);
+    color: var(--navy);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .code {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--navy);
+    color: var(--cyan);
+    padding: 14px 18px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.65;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .code.small { font-size: 11px; line-height: 1.55; padding: 12px 16px; }
+  .code .kw { color: #FF7AB6; }
+  .code .str { color: #A5E075; }
+  .code .cm { color: #7B8CA8; font-style: italic; }
+  .code .var { color: #FFD580; }
+  .code .num { color: #FFA0A0; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex: 1; min-height: 0; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; flex: 1; min-height: 0; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; flex: 1; min-height: 0; }
+  .grid-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; flex: 1; min-height: 0; }
+  .grid-1-2 { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; flex: 1; min-height: 0; }
+  .card {
+    background: var(--light);
+    border-radius: 10px;
+    padding: 16px;
+    border-left: 4px solid var(--blue);
+  }
+  .card.cyan { border-left-color: var(--cyan); }
+  .card.navy { border-left-color: var(--navy); }
+  .card.green { border-left-color: var(--green); }
+  .card.orange { border-left-color: var(--orange); }
+  .card.purple { border-left-color: var(--purple); }
+  .card.red { border-left-color: var(--red); }
+  .badge {
+    display: inline-block;
+    background: var(--cyan);
+    color: var(--white);
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .badge.blue { background: var(--blue); }
+  .badge.navy { background: var(--navy); }
+  .badge.green { background: var(--green); }
+  .badge.orange { background: var(--orange); }
+  .badge.purple { background: var(--purple); }
+  .badge.red { background: var(--red); }
+  .module-tag {
+    display: inline-block;
+    background: rgba(0, 174, 239, 0.12);
+    color: var(--blue);
+    padding: 5px 12px;
+    border-radius: 14px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .title-slide {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
+    color: var(--white);
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .title-slide h1 { color: var(--white); font-size: 54px; }
+  .title-slide .subtitle { color: rgba(255,255,255,0.85); font-size: 20px; }
+  .title-slide .brand-tag { color: rgba(255,255,255,0.6); }
+  .title-slide .slide-number { color: rgba(255,255,255,0.5); }
+  .title-slide .module-tag {
+    background: rgba(0, 174, 239, 0.25);
+    color: var(--cyan);
+  }
+  .decorative-circle {
+    position: absolute;
+    border-radius: 50%;
+    opacity: 0.08;
+    background: var(--cyan);
+  }
+  .diagram { width: 100%; height: 100%; }
+  .diagram-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 0;
+    min-height: 0;
+  }
+  text { font-family: 'Plus Jakarta Sans', sans-serif; }
+  .divider {
+    background: var(--navy);
+    color: var(--white);
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+  }
+  .divider h1 { color: var(--white); font-size: 60px; }
+  .divider .subtitle { color: var(--cyan); }
+  .divider .brand-tag, .divider .slide-number { color: rgba(255,255,255,0.5); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: var(--navy); color: var(--white); padding: 8px 10px; text-align: left; font-weight: 600; font-size: 12px; }
+  td { padding: 7px 10px; border-bottom: 1px solid var(--gray-light); font-size: 12px; }
+  tr:nth-child(even) td { background: var(--light); }
+  .check { color: var(--green); font-weight: 700; }
+  .cross { color: var(--red); font-weight: 700; }
+  .pill {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 9px;
+    font-size: 10px;
+    font-weight: 600;
+    background: var(--gray-light);
+    color: var(--navy);
+    margin-right: 4px;
+  }
+  .pill.cyan { background: rgba(0,174,239,0.15); color: var(--blue); }
+  .pill.green { background: rgba(16,185,129,0.15); color: #047857; }
+  .pill.orange { background: rgba(245,158,11,0.15); color: #B45309; }
+  .pill.red { background: rgba(239,68,68,0.15); color: #B91C1C; }
+  .num {
+    display: inline-flex;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--blue);
+    color: var(--white);
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 12px;
+    margin-right: 8px;
+  }
+  .num.cyan { background: var(--cyan); }
+  .num.navy { background: var(--navy); }
+  .stat { text-align: center; }
+  .stat-num { font-size: 36px; font-weight: 800; color: var(--blue); line-height: 1; }
+  .stat-label { font-size: 12px; color: var(--gray); margin-top: 6px; }
+  .info-box {
+    background: var(--light);
+    border-left: 4px solid var(--cyan);
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-top: 12px;
+  }
+  .info-box.navy {
+    background: var(--navy);
+    color: var(--white);
+    border-left-color: var(--cyan);
+  }
+  .info-box.navy p, .info-box.navy strong { color: var(--white); }
+  .info-box.navy .accent { color: var(--cyan); }
+  .info-box.warning {
+    background: rgba(245, 158, 11, 0.08);
+    border-left-color: var(--orange);
+  }
+  .info-box p { margin: 0; font-size: 12px; }
+  .kbd {
+    background: rgba(0,0,0,0.08);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+  }
+
+  /* Controls */
+  .controls {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    background: rgba(14, 28, 51, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 8px 12px;
+    border-radius: 999px;
+    z-index: 1000;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .deck:hover .controls,
+  .controls:hover,
+  .controls.show { opacity: 1; }
+  .ctrl-btn {
+    background: transparent;
+    border: none;
+    color: white;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    font-size: 15px;
+  }
+  .ctrl-btn:hover { background: rgba(255,255,255,0.15); }
+  .ctrl-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .ctrl-counter {
+    color: white;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    padding: 0 12px;
+    min-width: 70px;
+    text-align: center;
+    user-select: none;
+  }
+  .ctrl-counter input {
+    width: 32px;
+    background: transparent;
+    border: none;
+    color: white;
+    font-family: inherit;
+    font-size: inherit;
+    text-align: right;
+    outline: none;
+    border-bottom: 1px solid transparent;
+  }
+  .ctrl-counter input:focus { border-bottom-color: var(--cyan); }
+  .progress {
+    position: fixed;
+    top: 0; left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--blue), var(--cyan));
+    z-index: 1001;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 10px rgba(0, 174, 239, 0.6);
+  }
+  .deck.overview {
+    overflow-y: auto;
+    background: #0a1220;
+    padding: 60px 40px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 24px;
+  }
+  .deck.overview .slide {
+    position: relative;
+    top: auto; left: auto;
+    transform: none;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16/9;
+    opacity: 1;
+    pointer-events: auto;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .deck.overview .slide:hover {
+    transform: scale(1.02);
+    box-shadow: 0 12px 32px rgba(0, 174, 239, 0.3);
+  }
+  .deck.overview .slide.active {
+    outline: 3px solid var(--cyan);
+    outline-offset: 4px;
+  }
+  .hint {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(14, 28, 51, 0.85);
+    backdrop-filter: blur(10px);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-size: 12px;
+    z-index: 1000;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  .hint.show { opacity: 1; }
+  .hint kbd {
+    background: rgba(255,255,255,0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    margin: 0 2px;
+  }
+  @media print {
+    html, body { background: white; overflow: visible; height: auto; }
+    .deck { display: block; height: auto; width: auto; }
+    .slide {
+      position: relative;
+      top: auto; left: auto;
+      transform: none;
+      width: 100%;
+      page-break-after: always;
+      box-shadow: none;
+      opacity: 1 !important;
+      pointer-events: auto !important;
+      border-radius: 0;
+    }
+    .controls, .progress, .hint { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<div class="hint" id="hint">
+  <kbd>←</kbd> <kbd>→</kbd> naviguer &nbsp;·&nbsp; <kbd>F</kbd> plein écran &nbsp;·&nbsp; <kbd>O</kbd> vue d'ensemble
+</div>
+<div class="deck" id="deck">
+
+<!-- ============================ SLIDE 1 — TITRE ============================ -->
+<div class="slide title-slide">
+  <div class="brand-bar"></div>
+  <div class="decorative-circle" style="width: 400px; height: 400px; top: -100px; right: -100px;"></div>
+  <div class="decorative-circle" style="width: 250px; height: 250px; bottom: -80px; left: -80px;"></div>
+  <span class="module-tag">Module 2 / 7</span>
+  <h1>Gestion des<br/>machines virtuelles</h1>
+  <p class="subtitle">Nova en profondeur : architecture, configuration via Kolla-Ansible, hyperviseurs multiples et opérations sur les instances</p>
+  <div style="margin-top: 30px; display: flex; gap: 40px;">
+    <div>
+      <div style="font-size: 11px; opacity: 0.7; text-transform: uppercase; letter-spacing: 1px;">Brique principale</div>
+      <div style="font-size: 22px; font-weight: 700; margin-top: 4px;">OpenStack Nova</div>
+    </div>
+    <div>
+      <div style="font-size: 11px; opacity: 0.7; text-transform: uppercase; letter-spacing: 1px;">Outil de déploiement</div>
+      <div style="font-size: 22px; font-weight: 700; margin-top: 4px;">Kolla-Ansible</div>
+    </div>
+    <div>
+      <div style="font-size: 11px; opacity: 0.7; text-transform: uppercase; letter-spacing: 1px;">TP final</div>
+      <div style="font-size: 22px; font-weight: 700; margin-top: 4px;">Création d'une VM</div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Formation OpenStack</div>
+  <div class="slide-number">01 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 2 — SOMMAIRE ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">Plan du module</span>
+  <h1>Sommaire</h1>
+  <div class="grid-2" style="margin-top: 16px;">
+    <div>
+      <div class="card cyan" style="margin-bottom: 12px;">
+        <h3><span class="num cyan">1</span>Nova en profondeur</h3>
+        <p style="font-size: 12px; margin-left: 36px;">Architecture interne, composants (api, scheduler, conductor, compute, placement), flux d'une requête</p>
+      </div>
+      <div class="card" style="margin-bottom: 12px;">
+        <h3><span class="num">2</span>Configuration Nova via Kolla-Ansible</h3>
+        <p style="font-size: 12px; margin-left: 36px;">globals.yml, nova.conf, overrides, déploiement, vérifications post-deploy</p>
+      </div>
+      <div class="card navy" style="margin-bottom: 12px;">
+        <h3><span class="num navy">3</span>Flavors et placement</h3>
+        <p style="font-size: 12px; margin-left: 36px;">Définition de gabarits, scheduler filters, weighers, host aggregates, availability zones</p>
+      </div>
+    </div>
+    <div>
+      <div class="card orange" style="margin-bottom: 12px;">
+        <h3><span class="num" style="background: var(--orange);">4</span>Images et instances</h3>
+        <p style="font-size: 12px; margin-left: 36px;">Cycle de vie, opérations CRUD, snapshots, migrations, evacuate, rescue, console</p>
+      </div>
+      <div class="card purple" style="margin-bottom: 12px;">
+        <h3><span class="num" style="background: var(--purple);">5</span>Réseau virtuel</h3>
+        <p style="font-size: 12px; margin-left: 36px;">Attachement des ports, security groups, floating IPs, metadata service, cloud-init</p>
+      </div>
+      <div class="card green" style="margin-bottom: 12px;">
+        <h3><span class="num" style="background: var(--green);">6</span>Hyperviseurs multiples</h3>
+        <p style="font-size: 12px; margin-left: 36px;">KVM, Hyper-V, ESXi : drivers, configuration, host aggregates dédiés</p>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">02 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 3 — DIVIDER NOVA ============================ -->
+<div class="slide divider">
+  <div class="brand-bar"></div>
+  <div class="decorative-circle" style="width: 500px; height: 500px; top: -150px; right: -150px;"></div>
+  <span class="module-tag">Chapitre 1</span>
+  <h1>Nova<br/>en profondeur</h1>
+  <p class="subtitle" style="margin-top: 20px;">Architecture interne et flux de bout en bout</p>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">03 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 4 — PRESENTATION NOVA ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">1. Nova en profondeur</span>
+  <h1>Nova : le moteur de calcul d'OpenStack</h1>
+  <p class="subtitle">Le service qui transforme une demande d'instance en VM réellement démarrée sur un hyperviseur</p>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🎯 Responsabilités</h3>
+      <ul>
+        <li><strong>Provisionner</strong> et gérer le cycle de vie complet des instances : create, start, stop, reboot, suspend, resize, migrate, delete</li>
+        <li><strong>Planifier le placement</strong> des instances sur les nœuds compute selon des filtres et poids</li>
+        <li><strong>Suivre l'inventaire</strong> des ressources disponibles (CPU, RAM, disque, PCI) via le service <code>placement</code></li>
+        <li><strong>Abstraire l'hyperviseur</strong> : KVM/QEMU, Hyper-V, ESXi, Ironic (bare-metal), LXC</li>
+        <li>Exposer une <strong>API REST</strong> (et une API EC2 historique) pour pilotage par CLI / SDK / Horizon</li>
+      </ul>
+    </div>
+    <div>
+      <h3>🧠 Principes de conception</h3>
+      <ul>
+        <li><strong>Shared-nothing</strong> : chaque composant est sans état, scalable horizontalement</li>
+        <li><strong>Découplage par message queue</strong> : RabbitMQ comme bus interne</li>
+        <li><strong>État centralisé</strong> dans une base SQL (MariaDB/Galera)</li>
+        <li><strong>Cells v2</strong> : partitionnement de l'infrastructure pour scaling horizontal</li>
+        <li><strong>Versionné</strong> par micro-version d'API (compatibilité ascendante)</li>
+      </ul>
+      <div class="info-box navy">
+        <p>💡 Nova est le projet le plus volumineux d'OpenStack — son code est au cœur de la mécanique du Cloud IaaS.</p>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">04 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 5 — ARCHITECTURE NOVA ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">1. Nova en profondeur</span>
+  <h1>Architecture interne de Nova</h1>
+  <div class="diagram-container">
+    <svg viewBox="0 0 1200 460" class="diagram">
+      <!-- Top: API layer -->
+      <rect x="30" y="20" width="1140" height="60" rx="8" fill="#0E1C33"/>
+      <text x="600" y="48" text-anchor="middle" fill="white" font-size="14" font-weight="700">Clients : Horizon • OpenStack CLI • SDK Python (openstacksdk) • API REST directe</text>
+      <text x="600" y="68" text-anchor="middle" fill="#00AEEF" font-size="11">https://compute.example.com:8774/v2.1/</text>
+
+      <!-- API services -->
+      <rect x="30" y="100" width="350" height="80" rx="8" fill="#0057B8"/>
+      <text x="205" y="125" text-anchor="middle" fill="white" font-size="14" font-weight="700">nova-api</text>
+      <text x="205" y="145" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="11">REST API + WSGI sous Apache/uwsgi</text>
+      <text x="205" y="162" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="11">Auth via Keystone middleware</text>
+
+      <rect x="400" y="100" width="350" height="80" rx="8" fill="#0057B8"/>
+      <text x="575" y="125" text-anchor="middle" fill="white" font-size="14" font-weight="700">nova-api-metadata</text>
+      <text x="575" y="145" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="11">Sert http://169.254.169.254/</text>
+      <text x="575" y="162" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="11">aux instances (cloud-init)</text>
+
+      <rect x="770" y="100" width="400" height="80" rx="8" fill="#0057B8"/>
+      <text x="970" y="125" text-anchor="middle" fill="white" font-size="14" font-weight="700">placement (service séparé)</text>
+      <text x="970" y="145" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="11">Inventaire des ressources :</text>
+      <text x="970" y="162" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="11">VCPU, MEMORY_MB, DISK_GB, PCI, VGPU</text>
+
+      <!-- Message queue -->
+      <rect x="30" y="200" width="1140" height="44" rx="6" fill="#00AEEF"/>
+      <text x="600" y="227" text-anchor="middle" fill="white" font-size="14" font-weight="700">📨 RabbitMQ — Message Queue (AMQP) : RPC asynchrone entre composants</text>
+
+      <!-- Core services -->
+      <rect x="30" y="265" width="270" height="90" rx="8" fill="#0E1C33"/>
+      <text x="165" y="290" text-anchor="middle" fill="white" font-size="13" font-weight="700">nova-scheduler</text>
+      <text x="165" y="310" text-anchor="middle" fill="#00AEEF" font-size="10">FilterScheduler</text>
+      <text x="165" y="328" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="10">Filtre les hosts puis</text>
+      <text x="165" y="344" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="10">les note (weighers)</text>
+
+      <rect x="320" y="265" width="270" height="90" rx="8" fill="#0E1C33"/>
+      <text x="455" y="290" text-anchor="middle" fill="white" font-size="13" font-weight="700">nova-conductor</text>
+      <text x="455" y="310" text-anchor="middle" fill="#00AEEF" font-size="10">Médiateur SQL</text>
+      <text x="455" y="328" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="10">Évite que les nodes compute</text>
+      <text x="455" y="344" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="10">accèdent à la DB directement</text>
+
+      <rect x="610" y="265" width="270" height="90" rx="8" fill="#0E1C33"/>
+      <text x="745" y="290" text-anchor="middle" fill="white" font-size="13" font-weight="700">nova-novncproxy</text>
+      <text x="745" y="310" text-anchor="middle" fill="#00AEEF" font-size="10">Proxy noVNC / SPICE</text>
+      <text x="745" y="328" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="10">Accès console des VM</text>
+      <text x="745" y="344" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="10">depuis le navigateur</text>
+
+      <rect x="900" y="265" width="270" height="90" rx="8" fill="#0E1C33"/>
+      <text x="1035" y="290" text-anchor="middle" fill="white" font-size="13" font-weight="700">nova-compute</text>
+      <text x="1035" y="310" text-anchor="middle" fill="#00AEEF" font-size="10">Agent sur chaque hyperviseur</text>
+      <text x="1035" y="328" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="10">Pilote libvirt/KVM, HyperV,</text>
+      <text x="1035" y="344" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="10">VMware, Ironic…</text>
+
+      <!-- DB and external -->
+      <rect x="30" y="380" width="370" height="60" rx="8" fill="#F5F7FA" stroke="#0E1C33" stroke-width="2"/>
+      <text x="215" y="405" text-anchor="middle" fill="#0E1C33" font-size="13" font-weight="700">🗄️ MariaDB — bases nova, nova_api, nova_cell0</text>
+      <text x="215" y="425" text-anchor="middle" fill="#6B7A8F" font-size="11">+ base placement (placement)</text>
+
+      <rect x="420" y="380" width="370" height="60" rx="8" fill="#F5F7FA" stroke="#0E1C33" stroke-width="2"/>
+      <text x="605" y="405" text-anchor="middle" fill="#0E1C33" font-size="13" font-weight="700">🔗 Services consommés</text>
+      <text x="605" y="425" text-anchor="middle" fill="#6B7A8F" font-size="11">Keystone (auth) • Glance (images) • Neutron (réseau) • Cinder (volumes)</text>
+
+      <rect x="810" y="380" width="360" height="60" rx="8" fill="#F5F7FA" stroke="#0E1C33" stroke-width="2"/>
+      <text x="990" y="405" text-anchor="middle" fill="#0E1C33" font-size="13" font-weight="700">⚡ Memcached</text>
+      <text x="990" y="425" text-anchor="middle" fill="#6B7A8F" font-size="11">Cache des tokens et états transitoires</text>
+
+      <!-- Connection lines -->
+      <line x1="205" y1="180" x2="205" y2="200" stroke="#6B7A8F" stroke-width="1.5"/>
+      <line x1="575" y1="180" x2="575" y2="200" stroke="#6B7A8F" stroke-width="1.5"/>
+      <line x1="970" y1="180" x2="970" y2="200" stroke="#6B7A8F" stroke-width="1.5"/>
+      <line x1="165" y1="244" x2="165" y2="265" stroke="#6B7A8F" stroke-width="1.5"/>
+      <line x1="455" y1="244" x2="455" y2="265" stroke="#6B7A8F" stroke-width="1.5"/>
+      <line x1="745" y1="244" x2="745" y2="265" stroke="#6B7A8F" stroke-width="1.5"/>
+      <line x1="1035" y1="244" x2="1035" y2="265" stroke="#6B7A8F" stroke-width="1.5"/>
+    </svg>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">05 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 6 — DETAIL DES COMPOSANTS ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">1. Nova en profondeur</span>
+  <h1>Rôle de chaque composant Nova</h1>
+  <div style="flex: 1; overflow: auto; margin-top: 8px;">
+    <table>
+      <thead>
+        <tr><th style="width: 18%;">Composant</th><th style="width: 12%;">Type</th><th>Rôle</th><th style="width: 22%;">Implémentation</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>nova-api</strong></td><td><span class="pill cyan">stateless</span></td><td>Point d'entrée REST. Authentifie via Keystone, valide les requêtes, persiste l'intention en base, publie un message RPC.</td><td>WSGI sous Apache + mod_wsgi ou uwsgi</td></tr>
+        <tr><td><strong>nova-api-metadata</strong></td><td><span class="pill cyan">stateless</span></td><td>Sert les métadonnées EC2 et user-data aux VM (consommé par cloud-init).</td><td>Process séparé sur port 8775</td></tr>
+        <tr><td><strong>nova-scheduler</strong></td><td><span class="pill cyan">stateless</span></td><td>Sélectionne le nœud compute cible : applique filters (CPU, RAM, AZ, affinity…) puis weighers (RAM libre, …).</td><td>Daemon Python</td></tr>
+        <tr><td><strong>nova-conductor</strong></td><td><span class="pill cyan">stateless</span></td><td>Intermédiaire SQL : seuls les conductors écrivent en base, les compute passent par eux (sécurité + upgrades).</td><td>Daemon Python</td></tr>
+        <tr><td><strong>nova-compute</strong></td><td><span class="pill orange">stateful*</span></td><td>Sur chaque hyperviseur. Reçoit les ordres et invoque le driver (libvirt, hyperv, vmwareapi, ironic).</td><td>Daemon Python par node</td></tr>
+        <tr><td><strong>nova-novncproxy</strong></td><td><span class="pill cyan">stateless</span></td><td>Proxy WebSocket pour la console graphique des VM dans le navigateur.</td><td>Daemon Python sur port 6080</td></tr>
+        <tr><td><strong>nova-spicehtml5proxy</strong></td><td><span class="pill cyan">stateless</span></td><td>Variante avec protocole SPICE (clipboard, audio, USB redirection).</td><td>Optionnel, port 6082</td></tr>
+        <tr><td><strong>nova-serialproxy</strong></td><td><span class="pill cyan">stateless</span></td><td>Console série pour les serveurs sans framebuffer (bare-metal, troubleshooting boot).</td><td>Port 6083</td></tr>
+        <tr><td><strong>placement</strong></td><td><span class="pill cyan">stateless</span></td><td>Inventaire des ressources allouables (Resource Providers). Requêté par le scheduler.</td><td>Service séparé depuis Stein</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="info-box">
+    <p>* <strong>nova-compute</strong> est "stateful" au sens où il pilote des VM locales, mais son état persistant est en DB via nova-conductor — il peut être redémarré sans perte.</p>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">06 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 7 — FLUX DE CREATION ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">1. Nova en profondeur</span>
+  <h1>Flux complet de création d'une instance</h1>
+  <div class="diagram-container">
+    <svg viewBox="0 0 1200 410" class="diagram">
+      <!-- Actors -->
+      <g font-size="11" font-weight="700">
+        <rect x="20" y="20" width="100" height="32" rx="5" fill="#0E1C33"/><text x="70" y="40" text-anchor="middle" fill="white">Client (CLI)</text>
+        <rect x="130" y="20" width="100" height="32" rx="5" fill="#0057B8"/><text x="180" y="40" text-anchor="middle" fill="white">Keystone</text>
+        <rect x="240" y="20" width="100" height="32" rx="5" fill="#0057B8"/><text x="290" y="40" text-anchor="middle" fill="white">nova-api</text>
+        <rect x="350" y="20" width="100" height="32" rx="5" fill="#00AEEF"/><text x="400" y="40" text-anchor="middle" fill="white">Placement</text>
+        <rect x="460" y="20" width="100" height="32" rx="5" fill="#0E1C33"/><text x="510" y="40" text-anchor="middle" fill="white">scheduler</text>
+        <rect x="570" y="20" width="100" height="32" rx="5" fill="#0E1C33"/><text x="620" y="40" text-anchor="middle" fill="white">conductor</text>
+        <rect x="680" y="20" width="100" height="32" rx="5" fill="#0E1C33"/><text x="730" y="40" text-anchor="middle" fill="white">compute</text>
+        <rect x="790" y="20" width="100" height="32" rx="5" fill="#00AEEF"/><text x="840" y="40" text-anchor="middle" fill="white">Glance</text>
+        <rect x="900" y="20" width="100" height="32" rx="5" fill="#00AEEF"/><text x="950" y="40" text-anchor="middle" fill="white">Neutron</text>
+        <rect x="1010" y="20" width="100" height="32" rx="5" fill="#00AEEF"/><text x="1060" y="40" text-anchor="middle" fill="white">libvirt/KVM</text>
+      </g>
+      <!-- Lifelines -->
+      <g stroke="#6B7A8F" stroke-dasharray="3,3" stroke-width="1">
+        <line x1="70" y1="52" x2="70" y2="395"/>
+        <line x1="180" y1="52" x2="180" y2="395"/>
+        <line x1="290" y1="52" x2="290" y2="395"/>
+        <line x1="400" y1="52" x2="400" y2="395"/>
+        <line x1="510" y1="52" x2="510" y2="395"/>
+        <line x1="620" y1="52" x2="620" y2="395"/>
+        <line x1="730" y1="52" x2="730" y2="395"/>
+        <line x1="840" y1="52" x2="840" y2="395"/>
+        <line x1="950" y1="52" x2="950" y2="395"/>
+        <line x1="1060" y1="52" x2="1060" y2="395"/>
+      </g>
+      <defs>
+        <marker id="ar" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+          <polygon points="0,0 10,5 0,10" fill="#0057B8"/>
+        </marker>
+      </defs>
+      <!-- Messages -->
+      <g font-size="10" fill="#0E1C33">
+        <line x1="70" y1="75" x2="180" y2="75" stroke="#0057B8" stroke-width="1.5" marker-end="url(#ar)"/>
+        <text x="125" y="70" text-anchor="middle">1. auth</text>
+
+        <line x1="70" y1="100" x2="290" y2="100" stroke="#0057B8" stroke-width="1.5" marker-end="url(#ar)"/>
+        <text x="180" y="95" text-anchor="middle">2. POST /servers</text>
+
+        <line x1="290" y1="125" x2="180" y2="125" stroke="#0057B8" stroke-width="1.5" marker-end="url(#ar)"/>
+        <text x="235" y="120" text-anchor="middle">3. valide token</text>
+
+        <line x1="290" y1="150" x2="400" y2="150" stroke="#0057B8" stroke-width="1.5" marker-end="url(#ar)"/>
+        <text x="345" y="145" text-anchor="middle">4. allocation candidates</text>
+
+        <line x1="290" y1="180" x2="620" y2="180" stroke="#0057B8" stroke-width="1.5" marker-end="url(#ar)"/>
+        <text x="455" y="175" text-anchor="middle">5. build_instance() via RabbitMQ</text>
+
+        <line x1="620" y1="205" x2="510" y2="205" stroke="#0057B8" stroke-width="1.5" marker-end="url(#ar)"/>
+        <text x="565" y="200" text-anchor="middle">6. select_destinations()</text>
+
+        <line x1="510" y1="230" x2="400" y2="230" stroke="#0057B8" stroke-width="1.5" marker-end="url(#ar)"/>
+        <text x="455" y="225" text-anchor="middle">7. filter + weigh</text>
+
+        <line x1="620" y1="260" x2="730" y2="260" stroke="#0057B8" stroke-width="1.5" marker-end="url(#ar)"/>
+        <text x="675" y="255" text-anchor="middle">8. build_and_run_instance()</text>
+
+        <line x1="730" y1="285" x2="840" y2="285" stroke="#0057B8" stroke-width="1.5" marker-end="url(#ar)"/>
+        <text x="785" y="280" text-anchor="middle">9. download image</text>
+
+        <line x1="730" y1="310" x2="950" y2="310" stroke="#0057B8" stroke-width="1.5" marker-end="url(#ar)"/>
+        <text x="840" y="305" text-anchor="middle">10. create_port + plug VIF</text>
+
+        <line x1="730" y1="340" x2="1060" y2="340" stroke="#0057B8" stroke-width="1.5" marker-end="url(#ar)"/>
+        <text x="895" y="335" text-anchor="middle">11. virsh define + start</text>
+
+        <line x1="1060" y1="375" x2="70" y2="375" stroke="#00AEEF" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#ar)"/>
+        <text x="565" y="370" text-anchor="middle" fill="#6B7A8F">12. instance ACTIVE — IP retournée</text>
+      </g>
+    </svg>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">07 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 8 — CELLS V2 ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">1. Nova en profondeur</span>
+  <h1>Cells v2 — partitionnement pour le scaling</h1>
+  <p class="subtitle">Nova découpe son infrastructure en cellules pour scaler au-delà de quelques centaines de nodes</p>
+  <div class="grid-2-1" style="margin-top: 8px;">
+    <div>
+      <div class="diagram-container" style="padding: 0;">
+        <svg viewBox="0 0 720 360" class="diagram">
+          <!-- API cell -->
+          <rect x="20" y="20" width="680" height="100" rx="8" fill="#0E1C33"/>
+          <text x="360" y="48" text-anchor="middle" fill="white" font-size="14" font-weight="700">API Cell (nova_api DB) — globale</text>
+          <rect x="50" y="65" width="180" height="40" rx="4" fill="#0057B8"/><text x="140" y="89" text-anchor="middle" fill="white" font-size="11">nova-api</text>
+          <rect x="245" y="65" width="180" height="40" rx="4" fill="#0057B8"/><text x="335" y="89" text-anchor="middle" fill="white" font-size="11">nova-scheduler (super-conductor)</text>
+          <rect x="440" y="65" width="240" height="40" rx="4" fill="#0057B8"/><text x="560" y="89" text-anchor="middle" fill="white" font-size="11">cell0 (DB des instances échouées)</text>
+
+          <!-- Cell 1 -->
+          <rect x="20" y="150" width="335" height="190" rx="8" fill="#F5F7FA" stroke="#0057B8" stroke-width="2"/>
+          <text x="187" y="175" text-anchor="middle" fill="#0E1C33" font-size="13" font-weight="700">Cell 1 — DC Paris</text>
+          <rect x="40" y="190" width="295" height="34" rx="4" fill="#00AEEF"/><text x="187" y="212" text-anchor="middle" fill="white" font-size="11">nova_cell1 DB + RabbitMQ dédié</text>
+          <rect x="40" y="234" width="295" height="34" rx="4" fill="#00AEEF"/><text x="187" y="256" text-anchor="middle" fill="white" font-size="11">nova-conductor (cell-level)</text>
+          <rect x="40" y="278" width="140" height="50" rx="4" fill="#0057B8"/><text x="110" y="299" text-anchor="middle" fill="white" font-size="11">compute-01</text><text x="110" y="316" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="10">KVM</text>
+          <rect x="195" y="278" width="140" height="50" rx="4" fill="#0057B8"/><text x="265" y="299" text-anchor="middle" fill="white" font-size="11">compute-02</text><text x="265" y="316" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="10">KVM</text>
+
+          <!-- Cell 2 -->
+          <rect x="365" y="150" width="335" height="190" rx="8" fill="#F5F7FA" stroke="#0057B8" stroke-width="2"/>
+          <text x="532" y="175" text-anchor="middle" fill="#0E1C33" font-size="13" font-weight="700">Cell 2 — DC Lille</text>
+          <rect x="385" y="190" width="295" height="34" rx="4" fill="#00AEEF"/><text x="532" y="212" text-anchor="middle" fill="white" font-size="11">nova_cell2 DB + RabbitMQ dédié</text>
+          <rect x="385" y="234" width="295" height="34" rx="4" fill="#00AEEF"/><text x="532" y="256" text-anchor="middle" fill="white" font-size="11">nova-conductor (cell-level)</text>
+          <rect x="385" y="278" width="140" height="50" rx="4" fill="#0057B8"/><text x="455" y="299" text-anchor="middle" fill="white" font-size="11">compute-03</text><text x="455" y="316" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="10">Hyper-V</text>
+          <rect x="540" y="278" width="140" height="50" rx="4" fill="#0057B8"/><text x="610" y="299" text-anchor="middle" fill="white" font-size="11">compute-04</text><text x="610" y="316" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="10">ESXi</text>
+        </svg>
+      </div>
+    </div>
+    <div>
+      <h3>🧩 Concepts</h3>
+      <ul>
+        <li><strong>API Cell</strong> : nova-api, scheduler, placement, base globale</li>
+        <li><strong>Compute Cells</strong> : conductor + DB + RabbitMQ + N compute nodes</li>
+        <li><strong>cell0</strong> : cellule virtuelle qui stocke les instances dont le scheduling a échoué</li>
+        <li>Découplage des bases et des queues : isolation des pannes</li>
+        <li>Scaling jusqu'à <strong>10 000+ nodes</strong> par cloud</li>
+      </ul>
+      <div class="info-box navy">
+        <p>Depuis Pike, <strong>au moins une cell est obligatoire</strong>. Kolla-Ansible déploie une seule cell par défaut, suffisante pour la plupart des cas.</p>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">08 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 9 — PLACEMENT ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">1. Nova en profondeur</span>
+  <h1>Le service Placement</h1>
+  <p class="subtitle">Inventaire des ressources allouables — base du scheduling moderne</p>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>📦 Modèle de données</h3>
+      <ul>
+        <li><strong>Resource Provider</strong> : entité qui possède des ressources (un hyperviseur, un disque, un PCI device)</li>
+        <li><strong>Resource Class</strong> : type de ressource (VCPU, MEMORY_MB, DISK_GB, PCI_DEVICE, VGPU, NET_BW_KILOBIT_PER_SEC)</li>
+        <li><strong>Inventory</strong> : quantité totale + step + reserved</li>
+        <li><strong>Allocation</strong> : consommation par un consumer (= une instance)</li>
+        <li><strong>Trait</strong> : capacité qualitative (HW_CPU_X86_AVX2, COMPUTE_VOLUME_ATTACH, …)</li>
+        <li><strong>Aggregate</strong> : groupe logique de providers</li>
+      </ul>
+    </div>
+    <div>
+      <h3>🔍 Exemple de requête au scheduler</h3>
+      <pre class="code small"><span class="cm"># Le scheduler demande à Placement :</span>
+GET /allocation_candidates?
+  resources=<span class="var">VCPU</span>:2,<span class="var">MEMORY_MB</span>:4096,<span class="var">DISK_GB</span>:40
+  &required=<span class="var">HW_CPU_X86_AVX2</span>
+  &member_of=<span class="var">in:zone-paris</span>
+
+<span class="cm"># Réponse : liste de combinaisons</span>
+<span class="cm"># de providers qui satisfont la demande</span>
+{
+  <span class="str">"allocation_requests"</span>: [
+    { <span class="str">"allocations"</span>: {
+        <span class="str">"compute-01"</span>: {
+          <span class="str">"resources"</span>: {
+            <span class="str">"VCPU"</span>: <span class="num">2</span>,
+            <span class="str">"MEMORY_MB"</span>: <span class="num">4096</span>,
+            <span class="str">"DISK_GB"</span>: <span class="num">40</span>
+          }
+        }
+      }
+    }
+  ]
+}</pre>
+    </div>
+  </div>
+  <div class="info-box">
+    <p>💡 Placement remplace l'ancien mécanisme où nova-scheduler interrogeait directement la DB compute_nodes. Plus rapide, plus extensible et utilisable par d'autres projets (Neutron pour la BP réseau, Cyborg pour les accélérateurs).</p>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">09 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 10 — SCHEDULER FILTERS ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">1. Nova en profondeur</span>
+  <h1>nova-scheduler : filters et weighers</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🔍 Filters (binaire : oui/non)</h3>
+      <p style="font-size: 12px;">Éliminent les hosts qui ne respectent pas une contrainte. Les hosts restants passent à l'étape suivante.</p>
+      <table>
+        <thead><tr><th>Filter</th><th>Effet</th></tr></thead>
+        <tbody>
+          <tr><td>ComputeFilter</td><td>Host actif et activé</td></tr>
+          <tr><td>ComputeCapabilitiesFilter</td><td>Capacités matérielles compatibles</td></tr>
+          <tr><td>ImagePropertiesFilter</td><td>hypervisor_type, architecture alignés</td></tr>
+          <tr><td>AvailabilityZoneFilter</td><td>AZ demandée par le flavor</td></tr>
+          <tr><td>AggregateInstanceExtraSpecsFilter</td><td>Match des extra_specs / metadata</td></tr>
+          <tr><td>ServerGroupAntiAffinityFilter</td><td>Évite la co-localisation d'un même group</td></tr>
+          <tr><td>NUMATopologyFilter</td><td>Compatibilité NUMA / hugepages</td></tr>
+          <tr><td>PciPassthroughFilter</td><td>Présence des devices PCI demandés</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <h3>⚖️ Weighers (numérique : score)</h3>
+      <p style="font-size: 12px;">Chaque host restant reçoit un score pondéré ; celui avec le meilleur score est élu.</p>
+      <table>
+        <thead><tr><th>Weigher</th><th>Stratégie</th></tr></thead>
+        <tbody>
+          <tr><td>RAMWeigher</td><td>Plus de RAM libre = score élevé (spread)</td></tr>
+          <tr><td>DiskWeigher</td><td>Plus de disque libre = score élevé</td></tr>
+          <tr><td>CPUWeigher</td><td>Plus de vCPU libres = score élevé</td></tr>
+          <tr><td>IoOpsWeigher</td><td>Moins d'I/O en cours = mieux</td></tr>
+          <tr><td>MetricsWeigher</td><td>Custom metrics</td></tr>
+          <tr><td>BuildFailureWeigher</td><td>Pénalise les hosts qui échouent</td></tr>
+        </tbody>
+      </table>
+      <div class="info-box warning">
+        <p><strong>Stratégies typiques :</strong> spread (RAMWeigher positif) pour la performance, pack (négatif) pour la consolidation.</p>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">10 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 11 — CYCLE DE VIE D'UNE INSTANCE ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">1. Nova en profondeur</span>
+  <h1>Cycle de vie d'une instance</h1>
+  <div class="diagram-container">
+    <svg viewBox="0 0 1200 380" class="diagram">
+      <!-- States -->
+      <g font-size="11" font-weight="700">
+        <rect x="40" y="160" width="120" height="60" rx="30" fill="#F5F7FA" stroke="#0E1C33" stroke-width="2"/>
+        <text x="100" y="185" text-anchor="middle" fill="#0E1C33">BUILDING</text>
+        <text x="100" y="202" text-anchor="middle" fill="#6B7A8F" font-size="9">scheduling, spawn</text>
+
+        <rect x="220" y="160" width="120" height="60" rx="30" fill="#00AEEF"/>
+        <text x="280" y="185" text-anchor="middle" fill="white">ACTIVE</text>
+        <text x="280" y="202" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="9">VM en marche</text>
+
+        <rect x="400" y="40" width="120" height="60" rx="30" fill="#F5F7FA" stroke="#F59E0B" stroke-width="2"/>
+        <text x="460" y="65" text-anchor="middle" fill="#0E1C33">PAUSED</text>
+        <text x="460" y="82" text-anchor="middle" fill="#6B7A8F" font-size="9">en mémoire</text>
+
+        <rect x="400" y="160" width="120" height="60" rx="30" fill="#F5F7FA" stroke="#F59E0B" stroke-width="2"/>
+        <text x="460" y="185" text-anchor="middle" fill="#0E1C33">SUSPENDED</text>
+        <text x="460" y="202" text-anchor="middle" fill="#6B7A8F" font-size="9">sur disque</text>
+
+        <rect x="400" y="280" width="120" height="60" rx="30" fill="#F5F7FA" stroke="#0057B8" stroke-width="2"/>
+        <text x="460" y="305" text-anchor="middle" fill="#0E1C33">SHUTOFF</text>
+        <text x="460" y="322" text-anchor="middle" fill="#6B7A8F" font-size="9">arrêtée</text>
+
+        <rect x="600" y="40" width="120" height="60" rx="30" fill="#F5F7FA" stroke="#8B5CF6" stroke-width="2"/>
+        <text x="660" y="65" text-anchor="middle" fill="#0E1C33">RESCUE</text>
+        <text x="660" y="82" text-anchor="middle" fill="#6B7A8F" font-size="9">image de secours</text>
+
+        <rect x="600" y="160" width="120" height="60" rx="30" fill="#F5F7FA" stroke="#8B5CF6" stroke-width="2"/>
+        <text x="660" y="185" text-anchor="middle" fill="#0E1C33">RESIZED</text>
+        <text x="660" y="202" text-anchor="middle" fill="#6B7A8F" font-size="9">à confirmer</text>
+
+        <rect x="600" y="280" width="120" height="60" rx="30" fill="#F5F7FA" stroke="#8B5CF6" stroke-width="2"/>
+        <text x="660" y="305" text-anchor="middle" fill="#0E1C33">MIGRATING</text>
+        <text x="660" y="322" text-anchor="middle" fill="#6B7A8F" font-size="9">cold/live</text>
+
+        <rect x="800" y="160" width="120" height="60" rx="30" fill="#F5F7FA" stroke="#EF4444" stroke-width="2"/>
+        <text x="860" y="185" text-anchor="middle" fill="#0E1C33">ERROR</text>
+        <text x="860" y="202" text-anchor="middle" fill="#EF4444" font-size="9">échec</text>
+
+        <rect x="1000" y="160" width="160" height="60" rx="30" fill="#0E1C33"/>
+        <text x="1080" y="185" text-anchor="middle" fill="white">SOFT_DELETED →</text>
+        <text x="1080" y="202" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="9">DELETED</text>
+      </g>
+
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <polygon points="0,0 7,4 0,8" fill="#0057B8"/>
+        </marker>
+      </defs>
+      <g stroke="#0057B8" stroke-width="1.5" fill="none">
+        <path d="M 160 190 L 220 190" marker-end="url(#arr)"/>
+        <text x="190" y="183" font-size="9" fill="#0057B8" text-anchor="middle">spawn</text>
+
+        <path d="M 280 160 Q 280 90 400 70" marker-end="url(#arr)"/>
+        <text x="320" y="115" font-size="9" fill="#0057B8">pause</text>
+        <path d="M 400 100 Q 280 130 280 160" marker-end="url(#arr)"/>
+        <text x="345" y="155" font-size="9" fill="#0057B8">unpause</text>
+
+        <path d="M 340 190 L 400 190" marker-end="url(#arr)"/>
+        <text x="370" y="183" font-size="9" fill="#0057B8" text-anchor="middle">suspend</text>
+        <path d="M 400 210 L 340 210" marker-end="url(#arr)"/>
+        <text x="370" y="225" font-size="9" fill="#0057B8" text-anchor="middle">resume</text>
+
+        <path d="M 280 220 Q 280 290 400 310" marker-end="url(#arr)"/>
+        <text x="305" y="265" font-size="9" fill="#0057B8">stop</text>
+        <path d="M 400 290 Q 280 250 280 220" marker-end="url(#arr)"/>
+        <text x="340" y="270" font-size="9" fill="#0057B8">start</text>
+
+        <path d="M 340 175 Q 470 130 600 70" marker-end="url(#arr)"/>
+        <text x="490" y="125" font-size="9" fill="#0057B8">rescue</text>
+
+        <path d="M 340 200 L 600 190" marker-end="url(#arr)"/>
+        <text x="475" y="183" font-size="9" fill="#0057B8" text-anchor="middle">resize</text>
+        <path d="M 600 200 L 340 210" marker-end="url(#arr)"/>
+        <text x="475" y="220" font-size="9" fill="#0057B8" text-anchor="middle">confirm/revert</text>
+
+        <path d="M 340 215 Q 470 280 600 310" marker-end="url(#arr)"/>
+        <text x="490" y="260" font-size="9" fill="#0057B8">migrate</text>
+
+        <path d="M 340 190 Q 580 220 800 190" stroke-dasharray="3,3" marker-end="url(#arr)"/>
+        <text x="600" y="240" font-size="9" fill="#EF4444">erreur</text>
+
+        <path d="M 340 200 Q 670 260 1000 190" marker-end="url(#arr)"/>
+        <text x="700" y="260" font-size="9" fill="#0057B8">delete</text>
+      </g>
+    </svg>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">11 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 12 — DIVIDER KOLLA ============================ -->
+<div class="slide divider">
+  <div class="brand-bar"></div>
+  <div class="decorative-circle" style="width: 500px; height: 500px; top: -150px; left: -150px;"></div>
+  <span class="module-tag">Chapitre 2</span>
+  <h1>Configuration Nova<br/>via Kolla-Ansible</h1>
+  <p class="subtitle" style="margin-top: 20px;">Du globals.yml à la première VM en production</p>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">12 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 13 — KOLLA RAPPEL ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">2. Kolla-Ansible</span>
+  <h1>Kolla-Ansible : rappel et structure</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🐳 Principe</h3>
+      <ul>
+        <li>Chaque service Nova est packagé dans une <strong>image Docker</strong> officielle (<code>quay.io/openstack.kolla/*</code>)</li>
+        <li>Ansible orchestre le pull, la configuration et le démarrage des conteneurs sur les nodes</li>
+        <li>Les <strong>config files</strong> sont générés à partir de templates Jinja2 puis montés en bind-mount dans le conteneur</li>
+        <li>Données persistantes dans des volumes Docker nommés (<code>kolla_logs</code>, <code>nova_compute</code>…)</li>
+      </ul>
+      <h3 style="margin-top: 12px;">🔑 Fichiers clés</h3>
+      <ul>
+        <li><code>/etc/kolla/globals.yml</code> : variables globales</li>
+        <li><code>/etc/kolla/passwords.yml</code> : tous les mots de passe</li>
+        <li><code>multinode</code> ou <code>all-in-one</code> : inventaire</li>
+        <li><code>/etc/kolla/config/nova/*</code> : overrides spécifiques</li>
+      </ul>
+    </div>
+    <div>
+      <div class="diagram-container" style="padding: 0;">
+        <svg viewBox="0 0 540 360" class="diagram">
+          <rect x="20" y="20" width="500" height="60" rx="8" fill="#0E1C33"/>
+          <text x="270" y="48" text-anchor="middle" fill="white" font-size="13" font-weight="700">Nœud de déploiement</text>
+          <text x="270" y="68" text-anchor="middle" fill="#00AEEF" font-size="11">/etc/kolla + ansible-playbook (kolla-ansible)</text>
+
+          <line x1="100" y1="80" x2="100" y2="120" stroke="#0E1C33" stroke-width="2" marker-end="url(#km)"/>
+          <line x1="270" y1="80" x2="270" y2="120" stroke="#0E1C33" stroke-width="2" marker-end="url(#km)"/>
+          <line x1="440" y1="80" x2="440" y2="120" stroke="#0E1C33" stroke-width="2" marker-end="url(#km)"/>
+          <defs>
+            <marker id="km" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto">
+              <polygon points="0,0 4,8 8,0" fill="#0E1C33"/>
+            </marker>
+          </defs>
+
+          <rect x="20" y="130" width="160" height="210" rx="8" fill="#F5F7FA" stroke="#0057B8" stroke-width="2"/>
+          <text x="100" y="150" text-anchor="middle" fill="#0E1C33" font-size="12" font-weight="700">control-01</text>
+          <rect x="35" y="165" width="130" height="30" rx="4" fill="#0057B8"/><text x="100" y="184" text-anchor="middle" fill="white" font-size="10">nova_api</text>
+          <rect x="35" y="200" width="130" height="30" rx="4" fill="#0057B8"/><text x="100" y="219" text-anchor="middle" fill="white" font-size="10">nova_scheduler</text>
+          <rect x="35" y="235" width="130" height="30" rx="4" fill="#0057B8"/><text x="100" y="254" text-anchor="middle" fill="white" font-size="10">nova_conductor</text>
+          <rect x="35" y="270" width="130" height="30" rx="4" fill="#0057B8"/><text x="100" y="289" text-anchor="middle" fill="white" font-size="10">nova_novncproxy</text>
+          <rect x="35" y="305" width="130" height="30" rx="4" fill="#0057B8"/><text x="100" y="324" text-anchor="middle" fill="white" font-size="10">placement_api</text>
+
+          <rect x="190" y="130" width="160" height="210" rx="8" fill="#F5F7FA" stroke="#00AEEF" stroke-width="2"/>
+          <text x="270" y="150" text-anchor="middle" fill="#0E1C33" font-size="12" font-weight="700">compute-01</text>
+          <rect x="205" y="165" width="130" height="30" rx="4" fill="#00AEEF"/><text x="270" y="184" text-anchor="middle" fill="white" font-size="10">nova_compute</text>
+          <rect x="205" y="200" width="130" height="30" rx="4" fill="#00AEEF"/><text x="270" y="219" text-anchor="middle" fill="white" font-size="10">nova_libvirt</text>
+          <rect x="205" y="235" width="130" height="30" rx="4" fill="#00AEEF"/><text x="270" y="254" text-anchor="middle" fill="white" font-size="10">nova_ssh</text>
+          <text x="270" y="290" text-anchor="middle" fill="#6B7A8F" font-size="10">+ hôte : kvm + qemu</text>
+          <text x="270" y="310" text-anchor="middle" fill="#6B7A8F" font-size="10">/var/lib/nova/instances</text>
+
+          <rect x="360" y="130" width="160" height="210" rx="8" fill="#F5F7FA" stroke="#00AEEF" stroke-width="2"/>
+          <text x="440" y="150" text-anchor="middle" fill="#0E1C33" font-size="12" font-weight="700">compute-02</text>
+          <rect x="375" y="165" width="130" height="30" rx="4" fill="#00AEEF"/><text x="440" y="184" text-anchor="middle" fill="white" font-size="10">nova_compute</text>
+          <rect x="375" y="200" width="130" height="30" rx="4" fill="#00AEEF"/><text x="440" y="219" text-anchor="middle" fill="white" font-size="10">nova_libvirt</text>
+          <rect x="375" y="235" width="130" height="30" rx="4" fill="#00AEEF"/><text x="440" y="254" text-anchor="middle" fill="white" font-size="10">nova_ssh</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">13 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 14 — INVENTAIRE MULTINODE ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">2. Kolla-Ansible</span>
+  <h1>Fichier d'inventaire multinode</h1>
+  <p class="subtitle">Définir quel serveur joue quel rôle</p>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>📋 Structure d'inventaire</h3>
+      <pre class="code small"><span class="cm"># /etc/kolla/multinode</span>
+[control]
+control-01 ansible_host=<span class="num">10.10.0.11</span>
+control-02 ansible_host=<span class="num">10.10.0.12</span>
+control-03 ansible_host=<span class="num">10.10.0.13</span>
+
+[network]
+control-01
+control-02
+control-03
+
+[compute]
+compute-01 ansible_host=<span class="num">10.10.0.21</span>
+compute-02 ansible_host=<span class="num">10.10.0.22</span>
+compute-03 ansible_host=<span class="num">10.10.0.23</span>
+
+[monitoring]
+control-01
+
+[storage]
+storage-01 ansible_host=<span class="num">10.10.0.31</span>
+
+<span class="cm"># Groupes "logiques" Kolla</span>
+[nova-api:children]
+control
+
+[nova-compute:children]
+compute
+
+[nova-conductor:children]
+control
+
+[nova-scheduler:children]
+control
+
+[nova-novncproxy:children]
+control</pre>
+    </div>
+    <div>
+      <h3>📌 Rôles standards</h3>
+      <ul>
+        <li><strong>control</strong> : API, scheduler, conductor, DB, RabbitMQ, HAProxy</li>
+        <li><strong>compute</strong> : nova-compute, libvirt, hyperviseur</li>
+        <li><strong>network</strong> : agents Neutron L3/DHCP (peut co-localiser avec control)</li>
+        <li><strong>storage</strong> : Cinder, Swift, Ceph OSD</li>
+        <li><strong>monitoring</strong> : Prometheus, Grafana</li>
+      </ul>
+      <h3 style="margin-top: 12px;">🔧 Variables par host</h3>
+      <pre class="code small"><span class="cm"># Surcharger pour un host spécifique</span>
+[compute]
+compute-gpu-01 \
+  ansible_host=<span class="num">10.10.0.41</span> \
+  nova_compute_virt_type=<span class="str">kvm</span> \
+  enable_nova_libvirt_container=<span class="str">true</span>
+
+compute-hyperv-01 \
+  ansible_host=<span class="num">10.10.0.51</span> \
+  nova_compute_virt_type=<span class="str">hyperv</span></pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">14 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 15 — GLOBALS.YML CORE ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">2. Kolla-Ansible</span>
+  <h1>globals.yml — variables Nova essentielles</h1>
+  <pre class="code small" style="flex: 1; overflow: auto;"><span class="cm">################################################################
+# /etc/kolla/globals.yml — extraits Nova
+################################################################</span>
+
+<span class="cm"># Base — release et OS</span>
+<span class="kw">kolla_base_distro</span>: <span class="str">"rocky"</span>           <span class="cm"># ubuntu, debian, rocky, centos</span>
+<span class="kw">openstack_release</span>: <span class="str">"2024.1"</span>          <span class="cm"># Caracal SLURP</span>
+<span class="kw">openstack_logging_debug</span>: <span class="str">"False"</span>      <span class="cm"># Mettre à True pour debug</span>
+
+<span class="cm"># Réseau</span>
+<span class="kw">kolla_internal_vip_address</span>: <span class="str">"10.10.0.250"</span>     <span class="cm"># VIP interne (HAProxy)</span>
+<span class="kw">kolla_external_vip_address</span>: <span class="str">"203.0.113.250"</span>    <span class="cm"># VIP externe</span>
+<span class="kw">network_interface</span>: <span class="str">"bond0"</span>                  <span class="cm"># Management</span>
+<span class="kw">neutron_external_interface</span>: <span class="str">"bond1"</span>           <span class="cm"># Réseau provider/external</span>
+<span class="kw">tunnel_interface</span>: <span class="str">"bond0.100"</span>                <span class="cm"># VXLAN/GENEVE</span>
+
+<span class="cm"># Activation des services Nova</span>
+<span class="kw">enable_nova</span>: <span class="str">"yes"</span>
+<span class="kw">enable_nova_serialconsole_proxy</span>: <span class="str">"yes"</span>
+<span class="kw">enable_nova_ssh</span>: <span class="str">"yes"</span>                <span class="cm"># Migrations live entre computes</span>
+<span class="kw">enable_nova_libvirt_container</span>: <span class="str">"yes"</span>  <span class="cm"># libvirt dans un conteneur</span>
+
+<span class="cm"># Driver hyperviseur (par défaut sur les compute "génériques")</span>
+<span class="kw">nova_compute_virt_type</span>: <span class="str">"kvm"</span>         <span class="cm"># kvm | qemu | hyperv | vmware</span>
+<span class="kw">libvirt_enable_sasl</span>: <span class="str">"yes"</span>            <span class="cm"># Auth pour migration</span>
+
+<span class="cm"># Console et accès</span>
+<span class="kw">nova_console</span>: <span class="str">"novnc"</span>                 <span class="cm"># novnc | spice | serial</span>
+<span class="kw">nova_compute_resume_guests_state_on_host_boot</span>: <span class="str">"true"</span>
+
+<span class="cm"># Quotas par défaut au démarrage (cf. nova.conf [quota])</span>
+<span class="kw">nova_safety_upgrade</span>: <span class="str">"yes"</span></pre>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">15 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 16 — STRUCTURE OVERRIDES ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">2. Kolla-Ansible</span>
+  <h1>Structure des overrides Nova</h1>
+  <p class="subtitle">Personnaliser la configuration générée par Kolla sans toucher aux templates</p>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>📁 Arborescence /etc/kolla/config/</h3>
+      <pre class="code small">/etc/kolla/config/
+├── global.conf            <span class="cm"># Tous services</span>
+├── database.conf          <span class="cm"># Section [database]</span>
+├── messaging.conf         <span class="cm"># Section [oslo_messaging_*]</span>
+│
+└── nova/
+    ├── nova.conf          <span class="cm"># Tous nodes Nova</span>
+    ├── nova-api.conf      <span class="cm"># Spécifique nova-api</span>
+    ├── nova-compute.conf  <span class="cm"># Tous compute</span>
+    │
+    ├── compute-01/        <span class="cm"># Spécifique à un host</span>
+    │   └── nova-compute.conf
+    │
+    └── compute-hyperv-01/
+        └── nova-compute.conf</pre>
+      <div class="info-box">
+        <p>Les overrides sont <strong>fusionnés</strong> avec les configs générées par Kolla. On n'écrase pas tout, on ajoute/modifie des clés ciblées.</p>
+      </div>
+    </div>
+    <div>
+      <h3>🔧 Exemple : ratios de surcommit</h3>
+      <pre class="code small"><span class="cm"># /etc/kolla/config/nova.conf
+# Appliqué à tous les services Nova</span>
+
+[<span class="var">DEFAULT</span>]
+cpu_allocation_ratio = <span class="num">4.0</span>
+ram_allocation_ratio = <span class="num">1.5</span>
+disk_allocation_ratio = <span class="num">1.0</span>
+
+[<span class="var">scheduler</span>]
+discover_hosts_in_cells_interval = <span class="num">300</span>
+
+[<span class="var">filter_scheduler</span>]
+enabled_filters = ComputeFilter,
+  ComputeCapabilitiesFilter,
+  ImagePropertiesFilter,
+  ServerGroupAntiAffinityFilter,
+  ServerGroupAffinityFilter,
+  AggregateInstanceExtraSpecsFilter,
+  AvailabilityZoneFilter
+
+[<span class="var">libvirt</span>]
+cpu_mode = <span class="str">host-model</span>
+virt_type = <span class="str">kvm</span>
+disk_cachemodes = <span class="str">network=writeback</span></pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">16 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 17 — DEPLOIEMENT KOLLA ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">2. Kolla-Ansible</span>
+  <h1>Workflow de déploiement / mise à jour</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🚀 Premier déploiement</h3>
+      <pre class="code small"><span class="cm"># 1. Bootstrap : prépare les serveurs
+# (Docker, sysctl, hugepages, kernel modules)</span>
+<span class="kw">kolla-ansible</span> bootstrap-servers \
+  -i /etc/kolla/multinode
+
+<span class="cm"># 2. Pre-checks : valide DNS, NTP, dispo VIP…</span>
+<span class="kw">kolla-ansible</span> prechecks -i multinode
+
+<span class="cm"># 3. Pull les images Docker</span>
+<span class="kw">kolla-ansible</span> pull -i multinode
+
+<span class="cm"># 4. Déploiement complet</span>
+<span class="kw">kolla-ansible</span> deploy -i multinode
+
+<span class="cm"># 5. Post-deploy : génère openrc admin</span>
+<span class="kw">kolla-ansible</span> post-deploy
+<span class="kw">source</span> /etc/kolla/admin-openrc.sh</pre>
+    </div>
+    <div>
+      <h3>🔄 Reconfiguration ciblée</h3>
+      <pre class="code small"><span class="cm"># Reconfigurer Nova uniquement</span>
+<span class="kw">kolla-ansible</span> reconfigure -i multinode \
+  --tags nova
+
+<span class="cm"># Reconfigurer seulement nova-compute</span>
+<span class="kw">kolla-ansible</span> reconfigure -i multinode \
+  --tags nova-compute
+
+<span class="cm"># Limiter à un host</span>
+<span class="kw">kolla-ansible</span> reconfigure -i multinode \
+  --tags nova \
+  --limit compute-01
+
+<span class="cm"># Voir ce qui changerait sans appliquer</span>
+<span class="kw">kolla-ansible</span> reconfigure -i multinode \
+  --tags nova \
+  --check --diff
+
+<span class="cm"># Mise à jour : nouvelle release</span>
+<span class="cm"># 1. Maj globals.yml : openstack_release</span>
+<span class="kw">kolla-ansible</span> pull -i multinode
+<span class="kw">kolla-ansible</span> upgrade -i multinode</pre>
+    </div>
+  </div>
+  <div class="info-box navy">
+    <p>💡 La commande <strong>reconfigure</strong> est idempotente : Kolla compare l'état souhaité au courant, redémarre uniquement les conteneurs dont la config a changé, et applique les migrations DB nécessaires.</p>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">17 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 18 — DISCOVER HOSTS ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">2. Kolla-Ansible</span>
+  <h1>Découverte des compute nodes (cells)</h1>
+  <p class="subtitle">Quand on ajoute un compute, il faut le déclarer dans la cell</p>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>⚙️ Mécanisme</h3>
+      <ul>
+        <li>nova-compute démarre et s'enregistre dans la base <code>nova</code> de la cell</li>
+        <li>Le scheduler ne le voit pas tant qu'il n'a pas été mappé dans <code>nova_api.host_mappings</code></li>
+        <li>La commande <code>nova-manage cell_v2 discover_hosts</code> fait ce mapping</li>
+        <li>Kolla configure le scheduler pour le faire automatiquement toutes les 5 min : <code>discover_hosts_in_cells_interval=300</code></li>
+        <li>Mais on peut forcer manuellement pour gagner du temps</li>
+      </ul>
+    </div>
+    <div>
+      <h3>🛠️ Commandes pratiques</h3>
+      <pre class="code small"><span class="cm"># Exécuter dans le conteneur nova_api du leader</span>
+<span class="kw">docker</span> exec -it nova_api bash
+
+<span class="cm"># Lister les cells configurées</span>
+<span class="kw">nova-manage</span> cell_v2 list_cells
+
+<span class="cm"># Lister les hosts par cell</span>
+<span class="kw">nova-manage</span> cell_v2 list_hosts
+
+<span class="cm"># Découvrir manuellement</span>
+<span class="kw">nova-manage</span> cell_v2 discover_hosts \
+  --verbose
+
+<span class="cm"># Côté client</span>
+<span class="kw">openstack</span> compute service list
+<span class="kw">openstack</span> hypervisor list
+<span class="kw">openstack</span> hypervisor show compute-01</pre>
+    </div>
+  </div>
+  <div class="info-box warning">
+    <p>⚠️ Sans discover_hosts, un nouveau compute est invisible au scheduler — toutes les nouvelles instances atterrissent ailleurs. Symptôme typique : "<em>j'ai ajouté un node mais aucune VM ne s'y crée</em>".</p>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">18 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 19 — VERIFICATIONS POST DEPLOY ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">2. Kolla-Ansible</span>
+  <h1>Vérifications post-déploiement</h1>
+  <pre class="code small" style="flex: 1; overflow: auto;"><span class="cm">################################################################
+# 1. Tous les conteneurs Nova doivent tourner et être "healthy"
+################################################################</span>
+<span class="kw">docker</span> ps --filter <span class="str">"name=nova"</span> --format <span class="str">"table {{.Names}}\t{{.Status}}"</span>
+<span class="cm"># Attendu sur control : nova_api, nova_scheduler, nova_conductor,
+# nova_novncproxy, placement_api</span>
+<span class="cm"># Attendu sur compute : nova_compute, nova_libvirt, nova_ssh</span>
+
+<span class="cm">################################################################
+# 2. Services Nova "up"
+################################################################</span>
+<span class="kw">openstack</span> compute service list
+<span class="cm"># +----+----------------+------------+----------+---------+-------+
+# | ID | Binary         | Host       | Zone     | Status  | State |
+# +----+----------------+------------+----------+---------+-------+
+# |  1 | nova-conductor | control-01 | internal | enabled | up    |
+# |  2 | nova-scheduler | control-01 | internal | enabled | up    |
+# |  3 | nova-compute   | compute-01 | nova     | enabled | up    |
+# |  4 | nova-compute   | compute-02 | nova     | enabled | up    |
+# +----+----------------+------------+----------+---------+-------+</span>
+
+<span class="cm">################################################################
+# 3. Hyperviseurs visibles et ressources comptabilisées
+################################################################</span>
+<span class="kw">openstack</span> hypervisor list --long
+<span class="kw">openstack</span> hypervisor stats show
+
+<span class="cm">################################################################
+# 4. Endpoints API Nova et Placement présents dans le catalogue
+################################################################</span>
+<span class="kw">openstack</span> endpoint list --service nova
+<span class="kw">openstack</span> endpoint list --service placement
+
+<span class="cm">################################################################
+# 5. Test fonctionnel : créer une VM minimale
+################################################################</span>
+<span class="kw">openstack</span> server create test-vm \
+  --image cirros --flavor m1.tiny --network public \
+  --wait</pre>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">19 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 20 — DEBUGGING ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">2. Kolla-Ansible</span>
+  <h1>Diagnostiquer Nova en cas de pépin</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>📜 Où sont les logs ?</h3>
+      <pre class="code small"><span class="cm"># Sur l'hôte, montés depuis le conteneur</span>
+/var/log/kolla/nova/
+├── nova-api.log
+├── nova-scheduler.log
+├── nova-conductor.log
+├── nova-compute.log           <span class="cm"># sur les computes</span>
+├── nova-novncproxy.log
+└── nova-manage.log
+
+<span class="cm"># Suivi temps réel</span>
+<span class="kw">tail</span> -f /var/log/kolla/nova/nova-compute.log
+
+<span class="cm"># Via Docker directement</span>
+<span class="kw">docker</span> logs -f --tail 200 nova_compute
+
+<span class="cm"># Activer le debug global temporairement</span>
+<span class="cm"># Dans globals.yml :</span>
+<span class="kw">openstack_logging_debug</span>: <span class="str">"True"</span>
+<span class="cm"># Puis :</span>
+<span class="kw">kolla-ansible</span> reconfigure -i multinode \
+  --tags nova</pre>
+    </div>
+    <div>
+      <h3>🔬 Erreurs fréquentes</h3>
+      <table>
+        <thead><tr><th>Symptôme</th><th>Piste</th></tr></thead>
+        <tbody>
+          <tr><td>NoValidHost</td><td>Filtres trop stricts, ressources insuffisantes, AZ inexistante</td></tr>
+          <tr><td>Compute "down"</td><td>RabbitMQ, NTP désynchronisé, MTU réseau</td></tr>
+          <tr><td>Migration KO</td><td>SSH inter-compute, libvirt_tls, hostname résolution</td></tr>
+          <tr><td>Console noire</td><td>novncproxy_host/base_url, firewall sur 6080</td></tr>
+          <tr><td>Boot échoue</td><td>Image corrompue, virtio drivers manquants</td></tr>
+          <tr><td>Quota exceeded</td><td><code>openstack quota show</code></td></tr>
+        </tbody>
+      </table>
+      <pre class="code small"><span class="cm"># Voir les erreurs récentes d'une instance</span>
+<span class="kw">openstack</span> server event list &lt;uuid&gt;
+<span class="kw">openstack</span> server show &lt;uuid&gt;
+<span class="cm">  | grep fault</span></pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">20 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 21 — DIVIDER FLAVORS ============================ -->
+<div class="slide divider">
+  <div class="brand-bar"></div>
+  <div class="decorative-circle" style="width: 500px; height: 500px; bottom: -150px; right: -150px;"></div>
+  <span class="module-tag">Chapitre 3</span>
+  <h1>Flavors,<br/>placement et AZ</h1>
+  <p class="subtitle" style="margin-top: 20px;">Façonner l'offre du cloud et contrôler où les VM atterrissent</p>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">21 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 22 — FLAVORS ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">3. Flavors & placement</span>
+  <h1>Les flavors : gabarits de VM</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🎛️ Composition d'un flavor</h3>
+      <ul>
+        <li><strong>vCPUs</strong> : nombre de cœurs virtuels</li>
+        <li><strong>RAM</strong> : mémoire en Mo</li>
+        <li><strong>Disk</strong> : disque éphémère root en Go</li>
+        <li><strong>Ephemeral</strong> : disque éphémère secondaire</li>
+        <li><strong>Swap</strong> : swap en Mo</li>
+        <li><strong>RXTX Factor</strong> : multiplicateur de bande passante</li>
+        <li><strong>Extra specs</strong> : clés/valeurs pour le scheduling (NUMA, CPU pinning, hyperviseur cible…)</li>
+        <li><strong>is_public</strong> : visible par tous ou réservé à des projets</li>
+      </ul>
+      <h3 style="margin-top: 12px;">📐 Naming convention typique</h3>
+      <p style="font-size: 12px;"><code>m1.tiny</code>, <code>m1.small</code>, <code>m1.medium</code>, <code>c2.xlarge</code> (compute-optimized), <code>r4.large</code> (RAM-optimized), <code>g1.medium</code> (GPU)…</p>
+    </div>
+    <div>
+      <h3>💻 Création via CLI</h3>
+      <pre class="code small"><span class="cm"># Flavor standard</span>
+<span class="kw">openstack</span> flavor create \
+  --vcpus <span class="num">2</span> --ram <span class="num">4096</span> --disk <span class="num">40</span> \
+  --ephemeral <span class="num">0</span> --swap <span class="num">0</span> \
+  --rxtx-factor <span class="num">1.0</span> --public \
+  m1.medium
+
+<span class="cm"># Flavor avec extra specs (NUMA + pinning)</span>
+<span class="kw">openstack</span> flavor create m1.cpu-pinned \
+  --vcpus <span class="num">4</span> --ram <span class="num">8192</span> --disk <span class="num">40</span>
+
+<span class="kw">openstack</span> flavor set m1.cpu-pinned \
+  --property hw:cpu_policy=<span class="str">dedicated</span> \
+  --property hw:cpu_thread_policy=<span class="str">prefer</span> \
+  --property hw:mem_page_size=<span class="str">large</span> \
+  --property hw:numa_nodes=<span class="num">1</span>
+
+<span class="cm"># Flavor privé pour un projet</span>
+<span class="kw">openstack</span> flavor create r4.special \
+  --vcpus <span class="num">8</span> --ram <span class="num">32768</span> --disk <span class="num">100</span> \
+  --private
+<span class="kw">openstack</span> flavor set r4.special \
+  --project finance</pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">22 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 23 — HOST AGGREGATES & AZ ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">3. Flavors & placement</span>
+  <h1>Host Aggregates et Availability Zones</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🏷️ Host Aggregates</h3>
+      <p style="font-size: 13px;">Groupe logique de compute nodes partageant des <strong>propriétés</strong> (matériel, licence, fonctionnalité). Invisible aux utilisateurs.</p>
+      <pre class="code small"><span class="cm"># Créer un aggregate</span>
+<span class="kw">openstack</span> aggregate create \
+  --zone az-paris-1 \
+  ssd-nodes
+
+<span class="cm"># Tagger l'aggregate</span>
+<span class="kw">openstack</span> aggregate set \
+  --property storage_type=<span class="str">ssd</span> \
+  --property gpu=<span class="str">true</span> \
+  ssd-nodes
+
+<span class="cm"># Ajouter des hosts</span>
+<span class="kw">openstack</span> aggregate add host \
+  ssd-nodes compute-01
+<span class="kw">openstack</span> aggregate add host \
+  ssd-nodes compute-02
+
+<span class="cm"># Forcer un flavor à cibler ce groupe</span>
+<span class="kw">openstack</span> flavor set m1.gpu \
+  --property aggregate_instance_extra_specs:gpu=<span class="str">true</span></pre>
+    </div>
+    <div>
+      <h3>🌍 Availability Zones</h3>
+      <p style="font-size: 13px;">Vue <strong>publique</strong> de l'infrastructure : un user peut demander une AZ précise pour ses instances.</p>
+      <ul>
+        <li>Une AZ = un aggregate avec la propriété <code>availability_zone=&lt;nom&gt;</code></li>
+        <li>Un host ne peut être que dans une seule AZ à la fois</li>
+        <li>Usage : isoler des datacenters, des salles, des armoires, des fournisseurs énergie</li>
+      </ul>
+      <pre class="code small"><span class="cm"># Lister les AZ</span>
+<span class="kw">openstack</span> availability zone list
+
+<span class="cm"># Créer une VM dans une AZ donnée</span>
+<span class="kw">openstack</span> server create \
+  --image ubuntu \
+  --flavor m1.medium \
+  --network internal \
+  --availability-zone az-lille-1 \
+  web-1</pre>
+    </div>
+  </div>
+  <div class="info-box">
+    <p>💡 Bonne pratique : utiliser les <strong>aggregates</strong> pour les caractéristiques techniques (CPU, SSD, GPU) et les <strong>AZ</strong> pour la résilience géographique.</p>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">23 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 24 — SERVER GROUPS ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">3. Flavors & placement</span>
+  <h1>Server Groups : affinité et anti-affinité</h1>
+  <p class="subtitle">Placer plusieurs VM ensemble ou les éparpiller pour la HA</p>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>📦 Policies disponibles</h3>
+      <ul>
+        <li><strong>affinity</strong> : toutes les VM du groupe sur le <strong>même</strong> host (perf, latence)</li>
+        <li><strong>anti-affinity</strong> : toutes les VM du groupe sur des hosts <strong>différents</strong> (HA)</li>
+        <li><strong>soft-affinity</strong> : best-effort sur même host</li>
+        <li><strong>soft-anti-affinity</strong> : best-effort sur hosts différents</li>
+      </ul>
+      <div class="info-box warning">
+        <p>Les versions "soft" évitent les <code>NoValidHost</code> : si la contrainte ne peut être satisfaite, l'instance est tout de même créée.</p>
+      </div>
+    </div>
+    <div>
+      <h3>💻 Mise en pratique</h3>
+      <pre class="code small"><span class="cm"># Créer un groupe anti-affinity</span>
+<span class="kw">openstack</span> server group create \
+  --policy anti-affinity \
+  web-cluster
+
+<span class="cm"># Récupérer l'UUID</span>
+<span class="kw">GROUP_ID</span>=$(openstack server group list \
+  -f value -c ID | head -1)
+
+<span class="cm"># Créer 3 instances dans ce groupe</span>
+<span class="kw">for</span> i in <span class="num">1</span> <span class="num">2</span> <span class="num">3</span>; do
+  openstack server create web-$i \
+    --image ubuntu --flavor m1.medium \
+    --network internal \
+    --hint group=$GROUP_ID
+done
+
+<span class="cm"># Vérifier la répartition</span>
+<span class="kw">openstack</span> server list --long \
+  -c Name -c Host</pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">24 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 25 — DIVIDER IMAGES INSTANCES ============================ -->
+<div class="slide divider">
+  <div class="brand-bar"></div>
+  <div class="decorative-circle" style="width: 500px; height: 500px; top: -150px; right: -150px;"></div>
+  <span class="module-tag">Chapitre 4</span>
+  <h1>Images<br/>et instances</h1>
+  <p class="subtitle" style="margin-top: 20px;">Du fichier QCOW2 à la VM en production</p>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">25 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 26 — IMAGES ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">4. Images & instances</span>
+  <h1>Gestion des images via Glance</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>📥 Importer une image</h3>
+      <pre class="code small"><span class="cm"># Télécharger une image cloud Ubuntu</span>
+<span class="kw">wget</span> https://cloud-images.ubuntu.com/jammy/\
+current/jammy-server-cloudimg-amd64.img
+
+<span class="cm"># L'importer dans Glance</span>
+<span class="kw">openstack</span> image create <span class="str">"Ubuntu 22.04"</span> \
+  --file jammy-server-cloudimg-amd64.img \
+  --disk-format qcow2 \
+  --container-format bare \
+  --public
+
+<span class="cm"># Avec des propriétés pour le scheduling</span>
+<span class="kw">openstack</span> image set <span class="str">"Ubuntu 22.04"</span> \
+  --property hw_disk_bus=<span class="str">virtio</span> \
+  --property hw_vif_model=<span class="str">virtio</span> \
+  --property hw_qemu_guest_agent=<span class="str">yes</span> \
+  --property os_require_quiesce=<span class="str">yes</span> \
+  --property architecture=<span class="str">x86_64</span> \
+  --property hypervisor_type=<span class="str">kvm</span></pre>
+    </div>
+    <div>
+      <h3>🖼️ Propriétés importantes</h3>
+      <table>
+        <thead><tr><th>Propriété</th><th>Effet</th></tr></thead>
+        <tbody>
+          <tr><td><code>hw_disk_bus</code></td><td>virtio | scsi | ide</td></tr>
+          <tr><td><code>hw_vif_model</code></td><td>virtio | e1000 | rtl8139</td></tr>
+          <tr><td><code>hw_qemu_guest_agent</code></td><td>Permet quiesce snapshot</td></tr>
+          <tr><td><code>hypervisor_type</code></td><td>kvm | vmware | hyperv</td></tr>
+          <tr><td><code>os_type</code></td><td>linux | windows</td></tr>
+          <tr><td><code>os_distro</code></td><td>ubuntu | centos | debian</td></tr>
+          <tr><td><code>hw_rng_model</code></td><td>virtio (entropie)</td></tr>
+          <tr><td><code>hw_video_model</code></td><td>cirrus | qxl | virtio</td></tr>
+        </tbody>
+      </table>
+      <h3 style="margin-top: 10px;">📦 Formats supportés</h3>
+      <p style="font-size: 12px;">QCOW2 (KVM, recommandé), RAW (perf max), VHD/VHDX (Hyper-V), VMDK (VMware), ISO (médias), AMI/AKI/ARI (compat EC2).</p>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">26 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 27 — CREER UNE VM ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">4. Images & instances</span>
+  <h1>Créer une instance — tous les modes</h1>
+  <pre class="code small" style="flex: 1; overflow: auto;"><span class="cm">################################################################
+# 1. VM basique (disque éphémère depuis l'image)
+################################################################</span>
+<span class="kw">openstack</span> server create web-01 \
+  --image <span class="str">"Ubuntu 22.04"</span> \
+  --flavor m1.medium \
+  --key-name my-key \
+  --network internal-net \
+  --security-group default \
+  --security-group web
+
+<span class="cm">################################################################
+# 2. VM avec disque persistant (boot from volume Cinder)
+################################################################</span>
+<span class="kw">openstack</span> server create db-01 \
+  --flavor m1.large \
+  --network internal-net \
+  --block-device <span class="str">source_type=image,uuid=$IMG_ID,volume_size=80,</span>\
+<span class="str">destination_type=volume,boot_index=0,delete_on_termination=false</span>
+
+<span class="cm">################################################################
+# 3. VM avec config-drive et user-data (cloud-init)
+################################################################</span>
+<span class="kw">cat</span> &gt; user-data.yml &lt;&lt;<span class="str">EOF</span>
+#cloud-config
+hostname: web-02
+package_update: true
+packages:
+  - nginx
+  - htop
+runcmd:
+  - systemctl enable --now nginx
+  - echo "Hello from Nova" &gt; /var/www/html/index.html
+<span class="str">EOF</span>
+
+<span class="kw">openstack</span> server create web-02 \
+  --image <span class="str">"Ubuntu 22.04"</span> --flavor m1.medium \
+  --network internal-net --key-name my-key \
+  --user-data user-data.yml \
+  --config-drive true
+
+<span class="cm">################################################################
+# 4. VM dans une AZ + serveur group + flavor à extra-specs
+################################################################</span>
+<span class="kw">openstack</span> server create app-01 \
+  --image <span class="str">"Ubuntu 22.04"</span> --flavor m1.cpu-pinned \
+  --network internal-net --key-name my-key \
+  --availability-zone az-paris-1 \
+  --hint group=$GROUP_ID</pre>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">27 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 28 — OPERATIONS CYCLE DE VIE ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">4. Images & instances</span>
+  <h1>Opérations sur les instances</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🔧 Opérations courantes</h3>
+      <pre class="code small"><span class="cm"># État et inspection</span>
+<span class="kw">openstack</span> server list
+<span class="kw">openstack</span> server show web-01
+<span class="kw">openstack</span> server event list web-01
+
+<span class="cm"># Cycle de vie</span>
+<span class="kw">openstack</span> server stop web-01
+<span class="kw">openstack</span> server start web-01
+<span class="kw">openstack</span> server reboot web-01           <span class="cm"># soft</span>
+<span class="kw">openstack</span> server reboot --hard web-01    <span class="cm"># hard</span>
+<span class="kw">openstack</span> server pause web-01
+<span class="kw">openstack</span> server unpause web-01
+<span class="kw">openstack</span> server suspend web-01           <span class="cm"># sur disque</span>
+<span class="kw">openstack</span> server resume web-01
+
+<span class="cm"># Mode secours</span>
+<span class="kw">openstack</span> server rescue web-01 \
+  --image rescue-image
+<span class="kw">openstack</span> server unrescue web-01
+
+<span class="cm"># Destruction</span>
+<span class="kw">openstack</span> server delete web-01
+<span class="kw">openstack</span> server delete --wait web-01</pre>
+    </div>
+    <div>
+      <h3>🔄 Resize, snapshot, rebuild</h3>
+      <pre class="code small"><span class="cm"># Resize (changement de flavor)</span>
+<span class="kw">openstack</span> server resize \
+  --flavor m1.large web-01
+<span class="kw">openstack</span> server resize confirm web-01
+<span class="cm"># ou : openstack server resize revert web-01</span>
+
+<span class="cm"># Snapshot (image figée)</span>
+<span class="kw">openstack</span> server image create \
+  --name web-01-snap-2024 web-01
+
+<span class="cm"># Rebuild : redéploie l'instance
+# (même UUID, même IP) avec une nouvelle image</span>
+<span class="kw">openstack</span> server rebuild \
+  --image <span class="str">"Ubuntu 22.04 patched"</span> web-01
+
+<span class="cm"># Backup automatique (rotation)</span>
+<span class="kw">openstack</span> server backup create web-01 \
+  --name web-01-backup \
+  --type daily --rotate <span class="num">7</span>
+
+<span class="cm"># Accès console</span>
+<span class="kw">openstack</span> console url show web-01
+<span class="kw">openstack</span> console log show web-01 \
+  --lines <span class="num">200</span></pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">28 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 29 — MIGRATIONS ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">4. Images & instances</span>
+  <h1>Migrations : cold, live et evacuate</h1>
+  <div class="grid-3" style="margin-top: 8px;">
+    <div class="card">
+      <span class="badge blue">Cold</span>
+      <h3>Cold Migration</h3>
+      <ul style="font-size: 12px;">
+        <li>L'instance est <strong>arrêtée</strong>, son disque copié, redémarrée ailleurs</li>
+        <li>Interruption de service mais aucune contrainte technique</li>
+        <li>OK même sans stockage partagé</li>
+      </ul>
+      <pre class="code small" style="margin-top: 8px;"><span class="kw">openstack</span> server migrate \
+  web-01 \
+  --host compute-03 \
+  --wait</pre>
+    </div>
+    <div class="card cyan">
+      <span class="badge">Live</span>
+      <h3>Live Migration</h3>
+      <ul style="font-size: 12px;">
+        <li>VM <strong>sans interruption</strong> visible (downtime ~1s)</li>
+        <li>Nécessite : SSH inter-compute, libvirt TLS/SASL</li>
+        <li>Stockage partagé (NFS, Ceph) ou block-migration</li>
+      </ul>
+      <pre class="code small" style="margin-top: 8px;"><span class="kw">openstack</span> server migrate \
+  web-01 --live-migration \
+  --host compute-03 \
+  --block-migration</pre>
+    </div>
+    <div class="card red">
+      <span class="badge red">Evacuate</span>
+      <h3>Evacuate</h3>
+      <ul style="font-size: 12px;">
+        <li>Rebuild d'une instance dont le compute est <strong>HS</strong></li>
+        <li>Possible uniquement si le disque est sur stockage partagé</li>
+        <li>Action manuelle ou via masakari (HA)</li>
+      </ul>
+      <pre class="code small" style="margin-top: 8px;"><span class="cm"># Le compute-01 est en panne</span>
+<span class="kw">openstack</span> server evacuate \
+  web-01 \
+  --host compute-02</pre>
+    </div>
+  </div>
+  <div class="info-box navy" style="margin-top: 12px;">
+    <p><span class="accent">⚙️ Pré-requis live-migration (Kolla) :</span> <code>enable_nova_ssh=yes</code>, <code>libvirt_enable_sasl=yes</code>, <code>nova_compute_resume_guests_state_on_host_boot=true</code>, ports 16509 (libvirt) et 49152-49215 (TCP) ouverts entre computes.</p>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">29 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 30 — DIVIDER NETWORK ============================ -->
+<div class="slide divider">
+  <div class="brand-bar"></div>
+  <div class="decorative-circle" style="width: 500px; height: 500px; bottom: -150px; left: -150px;"></div>
+  <span class="module-tag">Chapitre 5</span>
+  <h1>Réseau virtuel<br/>vu de Nova</h1>
+  <p class="subtitle" style="margin-top: 20px;">Ports, security groups, floating IPs et metadata service</p>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">30 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 31 — RESEAU NOVA NEUTRON ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">5. Réseau virtuel</span>
+  <h1>Nova ↔ Neutron : qui fait quoi ?</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>📞 Interactions</h3>
+      <ul>
+        <li>À la création d'une instance, nova-compute appelle Neutron pour <strong>créer (ou utiliser) un port</strong> sur le réseau demandé</li>
+        <li>Neutron renvoie l'<strong>IP allouée</strong>, le MAC, et les informations VIF (Virtual Interface)</li>
+        <li>nova-compute utilise un <strong>VIF driver</strong> pour brancher le port au tap/veth approprié de la VM</li>
+        <li>À la suppression, nova-compute demande à Neutron de libérer le port</li>
+      </ul>
+      <h3 style="margin-top: 10px;">🔌 VIF types courants (KVM)</h3>
+      <ul>
+        <li><code>ovs</code> : connexion via Open vSwitch (br-int)</li>
+        <li><code>linuxbridge</code> : pont Linux classique</li>
+        <li><code>vhostuser</code> : DPDK / OVS-DPDK</li>
+        <li><code>direct</code> : SR-IOV (passthrough)</li>
+      </ul>
+    </div>
+    <div>
+      <h3>💻 Manipuler les ports</h3>
+      <pre class="code small"><span class="cm"># Liste des ports d'une VM</span>
+<span class="kw">openstack</span> port list --server web-01
+
+<span class="cm"># Attacher un nouveau NIC à une VM live</span>
+<span class="kw">openstack</span> server add network \
+  web-01 backend-net
+
+<span class="cm"># Avec un port pré-créé</span>
+<span class="kw">openstack</span> port create \
+  --network backend-net \
+  --fixed-ip subnet=backend-subnet,\
+ip-address=<span class="num">10.20.0.50</span> \
+  web-01-eth1
+
+<span class="kw">openstack</span> server add port \
+  web-01 web-01-eth1
+
+<span class="cm"># Détacher</span>
+<span class="kw">openstack</span> server remove port \
+  web-01 web-01-eth1</pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">31 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 32 — SECURITY GROUPS ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">5. Réseau virtuel</span>
+  <h1>Security Groups : firewall stateful par port</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🛡️ Principes</h3>
+      <ul>
+        <li>Ensemble de règles <strong>ingress</strong> et <strong>egress</strong> appliquées sur les ports Neutron</li>
+        <li><strong>Stateful</strong> : les réponses sont automatiquement autorisées (conntrack)</li>
+        <li>Plusieurs groupes peuvent être attachés à un port (union des règles)</li>
+        <li>Par défaut : tout sortant autorisé, tout entrant refusé sauf depuis les VM du même groupe</li>
+      </ul>
+      <div class="info-box warning">
+        <p>Pas un VPN, pas un router : les security groups <strong>filtrent</strong> mais ne routent rien. Pour des règles inter-réseaux complexes, utiliser un FWaaS ou un firewall L3.</p>
+      </div>
+    </div>
+    <div>
+      <h3>💻 Exemple : ouvrir HTTP/HTTPS et SSH</h3>
+      <pre class="code small"><span class="kw">openstack</span> security group create web \
+  --description <span class="str">"Web stack"</span>
+
+<span class="cm"># SSH depuis le réseau d'admin uniquement</span>
+<span class="kw">openstack</span> security group rule create web \
+  --protocol tcp --dst-port <span class="num">22</span> \
+  --remote-ip <span class="num">10.0.0.0/24</span>
+
+<span class="cm"># HTTP / HTTPS depuis Internet</span>
+<span class="kw">openstack</span> security group rule create web \
+  --protocol tcp --dst-port <span class="num">80</span> \
+  --remote-ip <span class="num">0.0.0.0/0</span>
+<span class="kw">openstack</span> security group rule create web \
+  --protocol tcp --dst-port <span class="num">443</span> \
+  --remote-ip <span class="num">0.0.0.0/0</span>
+
+<span class="cm"># ICMP (ping) depuis tout l'internal</span>
+<span class="kw">openstack</span> security group rule create web \
+  --protocol icmp \
+  --remote-ip <span class="num">10.0.0.0/8</span>
+
+<span class="cm"># Appliquer à la VM</span>
+<span class="kw">openstack</span> server add security group \
+  web-01 web</pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">32 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 33 — FLOATING IPS ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">5. Réseau virtuel</span>
+  <h1>Floating IPs : exposer une VM à l'extérieur</h1>
+  <div class="grid-1-2" style="margin-top: 8px;">
+    <div>
+      <div class="diagram-container" style="padding: 0;">
+        <svg viewBox="0 0 380 320" class="diagram">
+          <ellipse cx="190" cy="30" rx="100" ry="22" fill="#0E1C33"/>
+          <text x="190" y="36" text-anchor="middle" fill="white" font-size="12" font-weight="700">Internet</text>
+          <line x1="190" y1="52" x2="190" y2="90" stroke="#0E1C33" stroke-width="2"/>
+
+          <rect x="80" y="90" width="220" height="50" rx="6" fill="#0057B8"/>
+          <text x="190" y="115" text-anchor="middle" fill="white" font-size="12" font-weight="700">Réseau external (provider)</text>
+          <text x="190" y="132" text-anchor="middle" fill="#00AEEF" font-size="10">203.0.113.0/24</text>
+          <line x1="190" y1="140" x2="190" y2="170" stroke="#0057B8" stroke-width="2"/>
+
+          <rect x="70" y="170" width="240" height="50" rx="6" fill="#00AEEF"/>
+          <text x="190" y="192" text-anchor="middle" fill="white" font-size="12" font-weight="700">Router virtuel + NAT 1:1</text>
+          <text x="190" y="210" text-anchor="middle" fill="white" font-size="10">203.0.113.42 → 10.0.10.5</text>
+          <line x1="190" y1="220" x2="190" y2="250" stroke="#0057B8" stroke-width="2"/>
+
+          <rect x="80" y="250" width="220" height="50" rx="6" fill="#0E1C33"/>
+          <text x="190" y="272" text-anchor="middle" fill="white" font-size="12" font-weight="700">Tenant network 10.0.10.0/24</text>
+          <text x="190" y="290" text-anchor="middle" fill="#00AEEF" font-size="10">VM web-01 — eth0 = 10.0.10.5</text>
+        </svg>
+      </div>
+    </div>
+    <div>
+      <h3>💻 Workflow CLI</h3>
+      <pre class="code small"><span class="cm"># Allouer une floating IP depuis le pool</span>
+<span class="kw">openstack</span> floating ip create public-net
+<span class="cm"># ⇒ 203.0.113.42</span>
+
+<span class="cm"># Associer à une VM</span>
+<span class="kw">openstack</span> server add floating ip \
+  web-01 <span class="num">203.0.113.42</span>
+
+<span class="cm"># Vérifier</span>
+<span class="kw">openstack</span> server show web-01 -c addresses
+<span class="cm"># addresses : 
+#   tenant-net=10.0.10.5, 203.0.113.42</span>
+
+<span class="cm"># Désassocier puis libérer</span>
+<span class="kw">openstack</span> server remove floating ip \
+  web-01 <span class="num">203.0.113.42</span>
+<span class="kw">openstack</span> floating ip delete \
+  <span class="num">203.0.113.42</span>
+
+<span class="cm"># Lister les IP allouées au projet</span>
+<span class="kw">openstack</span> floating ip list</pre>
+      <div class="info-box">
+        <p>Une floating IP n'est <strong>jamais vue depuis la VM</strong> elle-même ; c'est du DNAT côté routeur Neutron. La VM connaît uniquement son IP fixe.</p>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">33 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 34 — METADATA CLOUD-INIT ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">5. Réseau virtuel</span>
+  <h1>Metadata service et cloud-init</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>📡 Le metadata service</h3>
+      <ul>
+        <li>Chaque VM peut interroger <code>http://169.254.169.254/</code> pour récupérer ses métadonnées : hostname, public keys, user-data, network config</li>
+        <li>Sert à <strong>cloud-init</strong>, présent dans toutes les images cloud (Ubuntu, Debian, CentOS, Rocky, AlmaLinux…)</li>
+        <li>Le service est rendu par <strong>nova-api-metadata</strong> (control) via <strong>neutron-metadata-agent</strong> (routeur)</li>
+        <li>Alternative : <strong>config-drive</strong> — métadonnées montées en CD-ROM virtuel (utile sans réseau metadata)</li>
+      </ul>
+      <h3 style="margin-top: 10px;">🔍 Tester depuis la VM</h3>
+      <pre class="code small">curl http://169.254.169.254/\
+latest/meta-data/
+
+<span class="cm"># Hostname, public-keys, instance-id, ...</span>
+curl http://169.254.169.254/latest/\
+user-data</pre>
+    </div>
+    <div>
+      <h3>⚙️ user-data cloud-init complet</h3>
+      <pre class="code small"><span class="cm">#cloud-config
+# Customise une VM Ubuntu au premier boot</span>
+hostname: web-server
+fqdn: web-server.utopios.local
+manage_etc_hosts: <span class="kw">true</span>
+
+users:
+  - name: mohamed
+    sudo: <span class="str">"ALL=(ALL) NOPASSWD:ALL"</span>
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAA...
+
+package_update: <span class="kw">true</span>
+package_upgrade: <span class="kw">true</span>
+packages:
+  - nginx
+  - certbot
+  - python3-certbot-nginx
+  - htop
+
+write_files:
+  - path: /etc/nginx/sites-available/app
+    content: |
+      server {
+        listen 80;
+        root /var/www/app;
+      }
+
+runcmd:
+  - systemctl enable --now nginx
+  - mkdir -p /var/www/app
+  - ufw allow <span class="str">'Nginx Full'</span>
+
+final_message: <span class="str">"Server ready in $UPTIME"</span></pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">34 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 35 — DIVIDER HYPERVISEURS ============================ -->
+<div class="slide divider">
+  <div class="brand-bar"></div>
+  <div class="decorative-circle" style="width: 500px; height: 500px; top: -150px; left: -150px;"></div>
+  <span class="module-tag">Chapitre 6</span>
+  <h1>Hyperviseurs<br/>multiples</h1>
+  <p class="subtitle" style="margin-top: 20px;">KVM, Hyper-V, ESXi : un seul Nova, plusieurs technologies</p>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">35 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 36 — DRIVERS NOVA ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">6. Hyperviseurs multiples</span>
+  <h1>Nova compute drivers</h1>
+  <p class="subtitle">Un driver = une couche d'abstraction entre nova-compute et l'hyperviseur</p>
+  <div style="flex: 1; overflow: auto; margin-top: 8px;">
+    <table>
+      <thead>
+        <tr><th>Driver</th><th>Hyperviseur</th><th>Support</th><th>Cas d'usage</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>libvirt.LibvirtDriver</code> + <code>virt_type=kvm</code></td><td>KVM/QEMU sur Linux</td><td><span class="pill green">★ Référence</span></td><td>Production Linux, perf élevée (virtualisation matérielle Intel VT-x / AMD-V)</td></tr>
+        <tr><td><code>libvirt.LibvirtDriver</code> + <code>virt_type=qemu</code></td><td>QEMU pur logiciel</td><td><span class="pill orange">Tests</span></td><td>Lab sans extension CPU (DevStack en VM nested non activée)</td></tr>
+        <tr><td><code>hyperv.HyperVDriver</code></td><td>Microsoft Hyper-V</td><td><span class="pill cyan">Officiel</span></td><td>VM Windows natives, intégration Active Directory, charges .NET</td></tr>
+        <tr><td><code>vmwareapi.VMwareVCDriver</code></td><td>VMware vCenter / ESXi</td><td><span class="pill cyan">Officiel</span></td><td>Lift-and-shift de parc VMware existant, console vCenter conservée</td></tr>
+        <tr><td><code>ironic.IronicDriver</code></td><td>Serveurs physiques (bare-metal)</td><td><span class="pill green">★</span></td><td>HPC, GPU dédiés, charges I/O extrêmes, sécurité hardware</td></tr>
+        <tr><td><code>libvirt.LibvirtDriver</code> + <code>virt_type=lxc</code></td><td>Conteneurs LXC</td><td><span class="pill red">Legacy</span></td><td>Densité, pas d'isolation noyau</td></tr>
+        <tr><td><code>zun</code> (projet séparé)</td><td>Conteneurs Docker / Kata</td><td><span class="pill orange">Projet à part</span></td><td>Containers as VMs</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="info-box navy">
+    <p><span class="accent">🎯 Le bon mix :</span> dans un cloud privé hétérogène, on déploie des compute nodes spécialisés par type d'hyperviseur, on les regroupe par <strong>host aggregates</strong>, et on dirige les charges via les <strong>extra_specs</strong> du flavor ou les <strong>image properties</strong>.</p>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">36 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 37 — KVM CONFIGURATION ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">6. Hyperviseurs multiples</span>
+  <h1>KVM — configuration via Kolla</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>✅ Prérequis hôte</h3>
+      <ul>
+        <li>Linux avec extension CPU activée : <code>egrep -c '(vmx|svm)' /proc/cpuinfo</code></li>
+        <li>Modules noyau <code>kvm</code> et <code>kvm_intel</code> ou <code>kvm_amd</code></li>
+        <li><code>libvirtd</code> NE doit PAS tourner sur l'hôte : Kolla le déploie dans un conteneur</li>
+        <li>Désactiver AppArmor/SELinux strict sur les chemins libvirt ou les configurer correctement</li>
+      </ul>
+      <h3 style="margin-top: 12px;">🧰 Variables Kolla</h3>
+      <pre class="code small"><span class="cm"># globals.yml</span>
+<span class="kw">nova_compute_virt_type</span>: <span class="str">"kvm"</span>
+<span class="kw">enable_nova_libvirt_container</span>: <span class="str">"yes"</span>
+<span class="kw">libvirt_enable_sasl</span>: <span class="str">"yes"</span></pre>
+    </div>
+    <div>
+      <h3>⚙️ Overrides nova-compute</h3>
+      <pre class="code small"><span class="cm"># /etc/kolla/config/nova/nova-compute.conf</span>
+
+[<span class="var">libvirt</span>]
+virt_type = <span class="str">kvm</span>
+cpu_mode = <span class="str">host-model</span>
+<span class="cm"># Performances/migration optimales avec host-model
+# host-passthrough pour exposer toutes les features
+# (mais migration uniquement entre CPU identiques)</span>
+
+disk_cachemodes = <span class="str">"network=writeback,block=none"</span>
+hw_machine_type = <span class="str">"x86_64=q35"</span>
+images_type = <span class="str">qcow2</span>
+<span class="cm"># raw / qcow2 / rbd (Ceph) / lvm</span>
+
+[<span class="var">vnc</span>]
+enabled = <span class="kw">true</span>
+server_listen = <span class="str">0.0.0.0</span>
+server_proxyclient_address = $my_ip
+
+[<span class="var">DEFAULT</span>]
+reserved_host_memory_mb = <span class="num">2048</span>
+reserved_host_cpus = <span class="num">2</span></pre>
+    </div>
+  </div>
+  <div class="info-box warning">
+    <p>⚠️ <strong>nested virtualization :</strong> pour un lab Kolla dans une VM (VirtualBox/VMware), il faut activer la virtualisation imbriquée (<code>vmx</code>/<code>svm</code> exposé au guest) sinon Nova bascule en QEMU pur — beaucoup plus lent.</p>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">37 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 38 — HYPER-V ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">6. Hyperviseurs multiples</span>
+  <h1>Hyper-V — intégration dans OpenStack</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🪟 Architecture</h3>
+      <ul>
+        <li>Le service nova-compute Hyper-V s'installe <strong>directement sur Windows Server</strong> (avec rôle Hyper-V)</li>
+        <li>Kolla-Ansible n'orchestre <strong>pas</strong> ce service côté Windows : on le pose hors-Kolla</li>
+        <li>L'hôte Windows publie nova-compute via RabbitMQ et la DB sur la même infrastructure Kolla</li>
+        <li>Distribué via le projet <em>compute-hyperv</em> (anciennement <em>nova-hyperv</em>)</li>
+      </ul>
+      <h3 style="margin-top: 10px;">🎯 Quand l'utiliser ?</h3>
+      <ul>
+        <li>Parc Windows existant à intégrer</li>
+        <li>Charges <strong>Windows Server</strong> certifiées par Microsoft</li>
+        <li>Intégration Active Directory native</li>
+        <li>Licensing Datacenter favorable</li>
+      </ul>
+    </div>
+    <div>
+      <h3>💻 Installation Windows</h3>
+      <pre class="code small"><span class="cm"># Sur le serveur Windows avec rôle Hyper-V</span>
+PS&gt; Install-WindowsFeature Hyper-V \
+  -IncludeManagementTools -Restart
+
+<span class="cm"># Installer le package compute-hyperv</span>
+PS&gt; pip install compute-hyperv
+
+<span class="cm"># /etc/nova/nova.conf</span>
+[<span class="var">DEFAULT</span>]
+compute_driver = <span class="str">compute_hyperv.driver.HyperVDriver</span>
+transport_url = <span class="str">rabbit://openstack:****\
+@control-01:5672/</span>
+
+[<span class="var">hyperv</span>]
+vswitch_name = <span class="str">"external_vswitch"</span>
+limit_cpu_features = <span class="kw">false</span>
+config_drive_inject_password = <span class="kw">false</span>
+config_drive_cdrom = <span class="kw">true</span>
+
+<span class="cm"># Démarrer le service Windows</span>
+PS&gt; Start-Service nova-compute</pre>
+    </div>
+  </div>
+  <div class="info-box">
+    <p>💡 Côté Kolla, créer un <strong>host aggregate "hyperv"</strong> et orienter les flavors Windows vers ce groupe via <code>extra_specs</code>. Les compute KVM resteront pour Linux.</p>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">38 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 39 — VMWARE ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">6. Hyperviseurs multiples</span>
+  <h1>VMware ESXi via vCenter</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🏗️ Architecture VMwareVCDriver</h3>
+      <ul>
+        <li>nova-compute parle à <strong>vCenter Server</strong> (pas directement à ESXi) via l'API SOAP</li>
+        <li>Un <strong>seul nova-compute par cluster vCenter</strong> — il représente tous les ESXi du cluster</li>
+        <li>Le DRS de vCenter peut continuer à déplacer les VM ; Nova le tolère</li>
+        <li>Stockage : datastores VMFS / vSAN, traduits en disques pour Nova</li>
+        <li>Réseau : <strong>NSX</strong> ou dvSwitches portés à Neutron via le plugin VMware NSX</li>
+      </ul>
+      <h3 style="margin-top: 10px;">🎯 Quand l'utiliser ?</h3>
+      <ul>
+        <li>Hybridation avec un cluster VMware <strong>existant</strong></li>
+        <li>Workloads dépendantes de fonctionnalités VMware (vMotion, DRS, FT)</li>
+        <li>Migration progressive vers KVM</li>
+      </ul>
+    </div>
+    <div>
+      <h3>⚙️ Configuration nova-compute</h3>
+      <pre class="code small"><span class="cm"># Sur un compute "passerelle" Linux, hors cluster
+# /etc/kolla/config/nova/compute-vmware-01/
+#   nova-compute.conf</span>
+
+[<span class="var">DEFAULT</span>]
+compute_driver = <span class="str">vmwareapi.VMwareVCDriver</span>
+
+[<span class="var">vmware</span>]
+host_ip = <span class="str">vcenter.utopios.local</span>
+host_username = <span class="str">administrator@vsphere.local</span>
+host_password = <span class="str">SuperSecret!</span>
+cluster_name = <span class="str">Production-Cluster</span>
+datastore_regex = <span class="str">^datastore-prod-.*$</span>
+api_retry_count = <span class="num">10</span>
+task_poll_interval = <span class="num">5</span>
+use_linked_clone = <span class="kw">true</span>
+<span class="cm"># Réduit le temps de provisionnement</span>
+
+[<span class="var">oslo_concurrency</span>]
+lock_path = /var/lib/nova/tmp</pre>
+    </div>
+  </div>
+  <div class="info-box warning">
+    <p>⚠️ Compatibilité avec Neutron : par défaut, <strong>seul le plugin NSX-T</strong> intègre complètement vCenter à Neutron. Sans NSX, les fonctions réseau d'OpenStack (security groups, floating IPs) sont <strong>limitées</strong>.</p>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">39 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 40 — MIXED HOST AGGREGATES ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">6. Hyperviseurs multiples</span>
+  <h1>Stratégie multi-hyperviseur en production</h1>
+  <div class="diagram-container">
+    <svg viewBox="0 0 1180 380" class="diagram">
+      <!-- Top: API -->
+      <rect x="40" y="20" width="1100" height="50" rx="8" fill="#0E1C33"/>
+      <text x="590" y="50" text-anchor="middle" fill="white" font-size="14" font-weight="700">nova-api + nova-scheduler + placement (Kolla — control plane)</text>
+
+      <line x1="200" y1="70" x2="200" y2="100" stroke="#6B7A8F" stroke-width="2"/>
+      <line x1="590" y1="70" x2="590" y2="100" stroke="#6B7A8F" stroke-width="2"/>
+      <line x1="980" y1="70" x2="980" y2="100" stroke="#6B7A8F" stroke-width="2"/>
+
+      <!-- 3 aggregates -->
+      <g>
+        <rect x="40" y="100" width="320" height="260" rx="10" fill="#F5F7FA" stroke="#0057B8" stroke-width="2"/>
+        <rect x="60" y="115" width="280" height="30" rx="4" fill="#0057B8"/>
+        <text x="200" y="135" text-anchor="middle" fill="white" font-size="12" font-weight="700">Aggregate "kvm-linux"</text>
+        <text x="200" y="160" text-anchor="middle" fill="#0E1C33" font-size="11">extra_spec : aggregate_instance=kvm</text>
+
+        <rect x="60" y="180" width="280" height="55" rx="6" fill="#00AEEF"/>
+        <text x="200" y="200" text-anchor="middle" fill="white" font-size="11" font-weight="700">compute-kvm-01..N</text>
+        <text x="200" y="218" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="10">virt_type=kvm • Rocky Linux 9</text>
+
+        <rect x="60" y="250" width="280" height="40" rx="6" fill="white" stroke="#0E1C33"/>
+        <text x="200" y="275" text-anchor="middle" fill="#0E1C33" font-size="11">Flavors : m1.*, c2.*, r4.*</text>
+
+        <text x="200" y="320" text-anchor="middle" fill="#6B7A8F" font-size="11">→ Workloads Linux génériques</text>
+        <text x="200" y="338" text-anchor="middle" fill="#6B7A8F" font-size="11">→ 80% du cloud</text>
+      </g>
+
+      <g>
+        <rect x="380" y="100" width="320" height="260" rx="10" fill="#F5F7FA" stroke="#8B5CF6" stroke-width="2"/>
+        <rect x="400" y="115" width="280" height="30" rx="4" fill="#8B5CF6"/>
+        <text x="540" y="135" text-anchor="middle" fill="white" font-size="12" font-weight="700">Aggregate "hyperv-windows"</text>
+        <text x="540" y="160" text-anchor="middle" fill="#0E1C33" font-size="11">extra_spec : aggregate_instance=hyperv</text>
+
+        <rect x="400" y="180" width="280" height="55" rx="6" fill="#8B5CF6"/>
+        <text x="540" y="200" text-anchor="middle" fill="white" font-size="11" font-weight="700">compute-hyperv-01..N</text>
+        <text x="540" y="218" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="10">virt_type=hyperv • Windows Server 2022</text>
+
+        <rect x="400" y="250" width="280" height="40" rx="6" fill="white" stroke="#0E1C33"/>
+        <text x="540" y="275" text-anchor="middle" fill="#0E1C33" font-size="11">Flavors : win.std, win.sql</text>
+
+        <text x="540" y="320" text-anchor="middle" fill="#6B7A8F" font-size="11">→ Charges Windows / .NET</text>
+        <text x="540" y="338" text-anchor="middle" fill="#6B7A8F" font-size="11">→ AD, SQL Server</text>
+      </g>
+
+      <g>
+        <rect x="720" y="100" width="420" height="260" rx="10" fill="#F5F7FA" stroke="#F59E0B" stroke-width="2"/>
+        <rect x="740" y="115" width="380" height="30" rx="4" fill="#F59E0B"/>
+        <text x="930" y="135" text-anchor="middle" fill="white" font-size="12" font-weight="700">Aggregate "vmware-vcenter"</text>
+        <text x="930" y="160" text-anchor="middle" fill="#0E1C33" font-size="11">extra_spec : aggregate_instance=vmware</text>
+
+        <rect x="740" y="180" width="380" height="55" rx="6" fill="#F59E0B"/>
+        <text x="930" y="200" text-anchor="middle" fill="white" font-size="11" font-weight="700">compute-vmware-01 (passerelle)</text>
+        <text x="930" y="218" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="10">VMwareVCDriver → vCenter</text>
+
+        <rect x="740" y="250" width="380" height="40" rx="6" fill="white" stroke="#0E1C33"/>
+        <text x="930" y="275" text-anchor="middle" fill="#0E1C33" font-size="11">Flavors : legacy.*, vmware.*</text>
+
+        <text x="930" y="320" text-anchor="middle" fill="#6B7A8F" font-size="11">→ Charges héritées VMware</text>
+        <text x="930" y="338" text-anchor="middle" fill="#6B7A8F" font-size="11">→ Migration progressive</text>
+      </g>
+    </svg>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">40 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 41 — QUOTAS ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">6. Hyperviseurs multiples</span>
+  <h1>Quotas et limites par projet</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>📊 Ressources Nova quotables</h3>
+      <ul>
+        <li><strong>instances</strong> : nombre de VM</li>
+        <li><strong>cores</strong> : nombre total de vCPU</li>
+        <li><strong>ram</strong> : Mo totaux</li>
+        <li><strong>key_pairs</strong> : clés SSH</li>
+        <li><strong>metadata_items</strong> : métadonnées par VM</li>
+        <li><strong>server_groups</strong> : groupes d'affinité</li>
+        <li><strong>injected_files</strong> / <strong>injected_file_content_bytes</strong></li>
+      </ul>
+      <div class="info-box">
+        <p>Côté Neutron, Cinder, Glance : chaque projet a ses propres quotas (ports, volumes, taille image…). Les vérifier ensemble.</p>
+      </div>
+    </div>
+    <div>
+      <h3>💻 Manipulation des quotas</h3>
+      <pre class="code small"><span class="cm"># Voir les quotas d'un projet</span>
+<span class="kw">openstack</span> quota show finance
+
+<span class="cm"># Modifier</span>
+<span class="kw">openstack</span> quota set finance \
+  --instances <span class="num">50</span> \
+  --cores <span class="num">200</span> \
+  --ram <span class="num">409600</span>
+
+<span class="cm"># Voir l'usage actuel</span>
+<span class="kw">openstack</span> quota show finance --usage
+
+<span class="cm"># Quotas par défaut (class "default")</span>
+<span class="kw">openstack</span> quota show --default
+
+<span class="cm"># Sortie type :
+# +-------------+-------+----+--------+
+# | Resource    | Limit | In | Reserv |
+# +-------------+-------+----+--------+
+# | instances   | 50    | 12 | 0      |
+# | cores       | 200   | 48 | 0      |
+# | ram         | 409600| 96K| 0      |
+# +-------------+-------+----+--------+</span></pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">41 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 42 — TP PRESENTATION ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">Travaux pratiques</span>
+  <h1>TP : Création d'une VM depuis Nova</h1>
+  <p class="subtitle">Mettre en pratique tout ce qu'on vient de voir, de la config à la VM accessible</p>
+  <div class="grid-2" style="margin-top: 12px;">
+    <div>
+      <h3>🎯 Objectifs</h3>
+      <ul>
+        <li>Vérifier le déploiement Kolla-Ansible et l'état des services Nova</li>
+        <li>Importer une image Ubuntu cloud-init</li>
+        <li>Créer des flavors et un host aggregate</li>
+        <li>Configurer un security group et une floating IP</li>
+        <li>Créer une VM via CLI + via Horizon</li>
+        <li>Tester l'accès SSH et la console noVNC</li>
+        <li>Effectuer un resize et un snapshot</li>
+        <li>Migrer la VM vers un autre compute</li>
+      </ul>
+    </div>
+    <div>
+      <h3>🏗️ Environnement</h3>
+      <ul>
+        <li>1 nœud control + 2 nœuds compute (KVM) déployés via Kolla-Ansible</li>
+        <li>1 réseau externe Neutron (provider flat)</li>
+        <li>1 réseau interne avec routeur virtuel</li>
+        <li>Pool de floating IPs déjà alloué</li>
+        <li>Accès admin OpenStack (openrc sourced)</li>
+      </ul>
+      <div class="info-box navy">
+        <p><span class="accent">⏱️ Durée :</span> 2 h<br/><span class="accent">📦 Livrables :</span> Sorties CLI, captures Horizon, doc opérationnelle</p>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">42 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 43 — TP ETAPES 1 ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">Travaux pratiques</span>
+  <h1>TP — Étapes 1 à 4</h1>
+  <pre class="code small" style="flex: 1; overflow: auto;"><span class="cm">################################################################
+# Étape 1 — Vérifier l'état de Nova côté Kolla
+################################################################</span>
+<span class="kw">source</span> /etc/kolla/admin-openrc.sh
+
+<span class="kw">openstack</span> compute service list
+<span class="kw">openstack</span> hypervisor list --long
+<span class="kw">openstack</span> hypervisor stats show
+<span class="kw">docker</span> ps --filter <span class="str">"name=nova"</span>
+
+<span class="cm">################################################################
+# Étape 2 — Importer une image Ubuntu 22.04
+################################################################</span>
+<span class="kw">wget</span> -q https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+
+<span class="kw">openstack</span> image create <span class="str">"Ubuntu 22.04 LTS"</span> \
+  --file jammy-server-cloudimg-amd64.img \
+  --disk-format qcow2 --container-format bare \
+  --public \
+  --property hw_qemu_guest_agent=<span class="str">yes</span> \
+  --property hw_disk_bus=<span class="str">virtio</span>
+
+<span class="cm">################################################################
+# Étape 3 — Créer un flavor adapté
+################################################################</span>
+<span class="kw">openstack</span> flavor create m1.demo \
+  --vcpus <span class="num">2</span> --ram <span class="num">2048</span> --disk <span class="num">20</span> --public
+
+<span class="cm">################################################################
+# Étape 4 — Créer un host aggregate + AZ
+################################################################</span>
+<span class="kw">openstack</span> aggregate create --zone az-demo demo-zone
+<span class="kw">openstack</span> aggregate add host demo-zone compute-01
+<span class="kw">openstack</span> aggregate add host demo-zone compute-02
+<span class="kw">openstack</span> availability zone list</pre>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">43 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 44 — TP ETAPES 2 ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">Travaux pratiques</span>
+  <h1>TP — Étapes 5 à 8</h1>
+  <pre class="code small" style="flex: 1; overflow: auto;"><span class="cm">################################################################
+# Étape 5 — Préparer key-pair et security group
+################################################################</span>
+<span class="kw">ssh-keygen</span> -t ed25519 -f ~/.ssh/lab-key -N <span class="str">""</span>
+<span class="kw">openstack</span> keypair create --public-key ~/.ssh/lab-key.pub lab-key
+
+<span class="kw">openstack</span> security group create web-demo
+<span class="kw">openstack</span> security group rule create web-demo \
+  --protocol tcp --dst-port <span class="num">22</span> --remote-ip <span class="num">0.0.0.0/0</span>
+<span class="kw">openstack</span> security group rule create web-demo \
+  --protocol icmp
+
+<span class="cm">################################################################
+# Étape 6 — Lancer la VM avec cloud-init
+################################################################</span>
+<span class="kw">cat</span> &gt; /tmp/user-data.yml &lt;&lt;<span class="str">EOF</span>
+#cloud-config
+hostname: demo-vm
+packages: [nginx, htop]
+runcmd:
+  - systemctl enable --now nginx
+  - echo "TP Nova OK on $(hostname)" &gt; /var/www/html/index.html
+<span class="str">EOF</span>
+
+<span class="kw">openstack</span> server create demo-vm \
+  --image <span class="str">"Ubuntu 22.04 LTS"</span> --flavor m1.demo \
+  --network internal-net --security-group web-demo \
+  --key-name lab-key --availability-zone az-demo \
+  --user-data /tmp/user-data.yml --wait
+
+<span class="cm">################################################################
+# Étape 7 — Floating IP et test
+################################################################</span>
+<span class="kw">FIP</span>=$(openstack floating ip create public-net -f value -c floating_ip_address)
+<span class="kw">openstack</span> server add floating ip demo-vm $FIP
+<span class="kw">ssh</span> -i ~/.ssh/lab-key ubuntu@$FIP <span class="str">"curl -s localhost"</span>
+
+<span class="cm">################################################################
+# Étape 8 — Snapshot, resize, migration
+################################################################</span>
+<span class="kw">openstack</span> server image create --name demo-snap demo-vm
+<span class="kw">openstack</span> server resize --flavor m1.medium demo-vm
+<span class="kw">openstack</span> server resize confirm demo-vm
+<span class="kw">openstack</span> server migrate demo-vm --live-migration \
+  --host compute-02 --block-migration</pre>
+  <div class="brand-tag">Utopios — Module 2</div>
+  <div class="slide-number">44 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 45 — RECAP ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">Récapitulatif</span>
+  <h1>Ce que vous avez appris</h1>
+  <div class="grid-2" style="margin-top: 12px;">
+    <div>
+      <div class="card cyan" style="margin-bottom: 10px;">
+        <h4><span class="num cyan">1</span>Architecture Nova</h4>
+        <p style="font-size: 12px; margin-left: 36px;">api / scheduler / conductor / compute / placement, cells v2, scheduling par filters + weighers</p>
+      </div>
+      <div class="card" style="margin-bottom: 10px;">
+        <h4><span class="num">2</span>Configuration Kolla-Ansible</h4>
+        <p style="font-size: 12px; margin-left: 36px;">globals.yml, overrides, deploy/reconfigure/upgrade, discover_hosts, vérifications, debug</p>
+      </div>
+      <div class="card navy" style="margin-bottom: 10px;">
+        <h4><span class="num navy">3</span>Flavors et placement</h4>
+        <p style="font-size: 12px; margin-left: 36px;">Création, extra_specs, host aggregates, AZ, server groups (affinity / anti-affinity)</p>
+      </div>
+      <div class="card orange" style="margin-bottom: 10px;">
+        <h4><span class="num" style="background: var(--orange);">4</span>Cycle de vie des instances</h4>
+        <p style="font-size: 12px; margin-left: 36px;">CRUD, snapshots, rebuild, rescue, resize, migrations cold/live/evacuate</p>
+      </div>
+    </div>
+    <div>
+      <div class="card purple" style="margin-bottom: 10px;">
+        <h4><span class="num" style="background: var(--purple);">5</span>Réseau côté Nova</h4>
+        <p style="font-size: 12px; margin-left: 36px;">Ports Neutron, security groups, floating IPs, metadata service, cloud-init</p>
+      </div>
+      <div class="card green" style="margin-bottom: 10px;">
+        <h4><span class="num" style="background: var(--green);">6</span>Multi-hyperviseur</h4>
+        <p style="font-size: 12px; margin-left: 36px;">KVM (référence), Hyper-V (Windows), ESXi via vCenter, stratégie par aggregate</p>
+      </div>
+      <h3 style="margin-top: 14px;">➡️ Prochain module</h3>
+      <div style="background: linear-gradient(135deg, var(--blue), var(--cyan)); color: var(--white); padding: 14px 18px; border-radius: 10px;">
+        <span style="font-size: 10px; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px;">Module 3 / 7</span>
+        <h4 style="color: var(--white); margin-top: 4px; margin-bottom: 4px; font-size: 16px;">Gestion du stockage</h4>
+        <p style="font-size: 12px; margin: 0; color: rgba(255,255,255,0.95);">Swift (object), Cinder (block), backends, pools, intégration Ceph.</p>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 2 — Fin</div>
+  <div class="slide-number">45 / 45</div>
+</div>
+
+</div>
+
+<div class="controls" id="controls">
+  <button class="ctrl-btn" id="btnFirst" title="Première (Home)">⏮</button>
+  <button class="ctrl-btn" id="btnPrev" title="Précédent (←)">←</button>
+  <div class="ctrl-counter">
+    <input type="number" id="slideInput" min="1" value="1"> / <span id="totalSlides">45</span>
+  </div>
+  <button class="ctrl-btn" id="btnNext" title="Suivant (→ ou Espace)">→</button>
+  <button class="ctrl-btn" id="btnLast" title="Dernière (End)">⏭</button>
+  <button class="ctrl-btn" id="btnOverview" title="Vue d'ensemble (O)">▦</button>
+  <button class="ctrl-btn" id="btnFullscreen" title="Plein écran (F)">⛶</button>
+</div>
+
+<script>
+(function() {
+  const deck = document.getElementById('deck');
+  const slides = Array.from(deck.querySelectorAll('.slide'));
+  const total = slides.length;
+  const progress = document.getElementById('progress');
+  const slideInput = document.getElementById('slideInput');
+  const totalSpan = document.getElementById('totalSlides');
+  const hint = document.getElementById('hint');
+
+  totalSpan.textContent = total;
+  slideInput.max = total;
+
+  let current = 0;
+  let overview = false;
+
+  function indexFromHash() {
+    const m = location.hash.match(/^#\/(\d+)$/);
+    if (m) {
+      const i = parseInt(m[1], 10) - 1;
+      if (i >= 0 && i < total) return i;
+    }
+    return 0;
+  }
+
+  function render() {
+    slides.forEach((s, i) => s.classList.toggle('active', i === current));
+    progress.style.width = ((current + 1) / total * 100) + '%';
+    slideInput.value = current + 1;
+    document.getElementById('btnPrev').disabled = current === 0;
+    document.getElementById('btnFirst').disabled = current === 0;
+    document.getElementById('btnNext').disabled = current === total - 1;
+    document.getElementById('btnLast').disabled = current === total - 1;
+    location.hash = '#/' + (current + 1);
+  }
+
+  function goto(i) {
+    if (i < 0) i = 0;
+    if (i >= total) i = total - 1;
+    current = i;
+    render();
+  }
+  function next() { goto(current + 1); }
+  function prev() { goto(current - 1); }
+
+  function toggleOverview() {
+    overview = !overview;
+    deck.classList.toggle('overview', overview);
+    if (overview) {
+      slides.forEach((s, i) => {
+        s.onclick = () => {
+          overview = false;
+          deck.classList.remove('overview');
+          slides.forEach(sl => sl.onclick = null);
+          goto(i);
+          window.scrollTo(0, 0);
+        };
+      });
+    } else {
+      slides.forEach(s => s.onclick = null);
+      window.scrollTo(0, 0);
+    }
+  }
+
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.();
+    } else {
+      document.exitFullscreen?.();
+    }
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+    switch (e.key) {
+      case 'ArrowRight':
+      case 'PageDown':
+      case ' ':
+        e.preventDefault(); next(); break;
+      case 'ArrowLeft':
+      case 'PageUp':
+        e.preventDefault(); prev(); break;
+      case 'Home':
+        e.preventDefault(); goto(0); break;
+      case 'End':
+        e.preventDefault(); goto(total - 1); break;
+      case 'f':
+      case 'F':
+        e.preventDefault(); toggleFullscreen(); break;
+      case 'o':
+      case 'O':
+        e.preventDefault(); toggleOverview(); break;
+      case 'Escape':
+        if (overview) { e.preventDefault(); toggleOverview(); }
+        break;
+    }
+  });
+
+  deck.addEventListener('click', (e) => {
+    if (overview) return;
+    if (e.target.closest('.controls') || e.target.closest('a') || e.target.closest('button') || e.target.closest('input')) return;
+    const rect = deck.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    if (x < rect.width * 0.3) prev();
+    else next();
+  });
+
+  let touchStartX = 0;
+  deck.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+  }, { passive: true });
+  deck.addEventListener('touchend', (e) => {
+    if (overview) return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 50) {
+      if (dx < 0) next(); else prev();
+    }
+  }, { passive: true });
+
+  document.getElementById('btnPrev').addEventListener('click', prev);
+  document.getElementById('btnNext').addEventListener('click', next);
+  document.getElementById('btnFirst').addEventListener('click', () => goto(0));
+  document.getElementById('btnLast').addEventListener('click', () => goto(total - 1));
+  document.getElementById('btnOverview').addEventListener('click', toggleOverview);
+  document.getElementById('btnFullscreen').addEventListener('click', toggleFullscreen);
+
+  slideInput.addEventListener('change', () => {
+    goto(parseInt(slideInput.value, 10) - 1);
+  });
+  slideInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') slideInput.blur();
+  });
+
+  window.addEventListener('hashchange', () => {
+    const i = indexFromHash();
+    if (i !== current) goto(i);
+  });
+
+  current = indexFromHash();
+  render();
+
+  hint.classList.add('show');
+  setTimeout(() => hint.classList.remove('show'), 4000);
+})();
+</script>
+</body>
+</html>

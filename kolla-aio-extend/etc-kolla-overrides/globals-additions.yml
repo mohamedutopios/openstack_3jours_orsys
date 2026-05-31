@@ -1,0 +1,55 @@
+# =============================================================
+# Snippets à AJOUTER (pas remplacer) à /etc/kolla/globals.yml
+# Activer phase par phase, puis relancer :
+#   kolla-ansible -i ./all-in-one deploy
+# =============================================================
+
+# --- Phase 1 : Barbican -----------------------------------------------
+# enable_barbican: "yes"
+
+# --- Phase 2 : Heat ---------------------------------------------------
+# enable_heat: "yes"
+# enable_horizon_heat: "yes"
+
+# --- Phase 3 : Swift --------------------------------------------------
+# Pré-requis : disques + rings préparés (scripts/30-, 31-)
+# enable_swift: "yes"
+# swift_devices_match_mode: "strict"
+# swift_devices_name: "KOLLA_SWIFT_DATA"
+
+# --- Phase 4 : Designate (DNSaaS) -------------------------------------
+# enable_designate: "yes"
+# designate_backend: "bind9"
+# designate_ns_record:
+#   - "ns1.example.org"
+
+# --- Phase 5 : Octavia (LBaaS) ----------------------------------------
+# Pré-requis : Barbican actif
+# enable_octavia: "yes"
+# octavia_auto_configure: "yes"
+# octavia_amp_flavor:
+#   name: "amphora"
+#   is_public: false
+#   vcpus: 1
+#   ram: 1024
+#   disk: 5
+# octavia_amp_network:
+#   name: lb-mgmt-net
+#   shared: false
+#   provider_network_type: vxlan
+#   external: false
+#   subnet:
+#     name: lb-mgmt-subnet
+#     cidr: "10.1.0.0/24"
+#     allocation_pool_start: "10.1.0.100"
+#     allocation_pool_end: "10.1.0.200"
+#     no_gateway_ip: yes
+#     enable_dhcp: yes
+
+# --- Phase 6 : Magnum -------------------------------------------------
+# Pré-requis : Heat + Barbican (idéalement Octavia)
+# enable_magnum: "yes"
+# enable_horizon_magnum: "yes"
+
+# --- Phase 7 : Skyline (dashboard alternatif) -------------------------
+# enable_skyline: "yes"

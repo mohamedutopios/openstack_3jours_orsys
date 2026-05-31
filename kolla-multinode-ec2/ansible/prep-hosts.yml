@@ -1,0 +1,118 @@
+---
+# Préparation des 3 nodes avant déploiement Kolla.
+# Idempotent : peut être ré-exécuté sans casse.
+- name: Préparation hôtes Kolla multinode
+  hosts: nodes
+  become: yes
+  vars:
+    vip_address: "10.0.1.10"      # doit correspondre à kolla_internal_vip_address
+    mgmt_iface: "ens5"            # ENI primaire (Nitro)
+    ext_iface: "ens6"             # ENI secondaire (Neutron external)
+    timezone: "Europe/Paris"
+
+  tasks:
+    - name: Mise à jour paquets et installation des prérequis
+      apt:
+        name:
+          - chrony
+          - python3-pip
+          - python3-venv
+          - git
+          - lvm2
+          - xfsprogs
+          - jq
+          - bridge-utils
+        state: present
+        update_cache: yes
+
+    - name: Timezone
+      community.general.timezone:
+        name: "{{ timezone }}"
+
+    - name: Activer chrony
+      systemd:
+        name: chrony
+        enabled: yes
+        state: started
+
+    - name: Désactiver UFW
+      systemd:
+        name: ufw
+        enabled: no
+        state: stopped
+      ignore_errors: yes
+
+    - name: /etc/hosts (résolution mutuelle)
+      blockinfile:
+        path: /etc/hosts
+        marker: "# {mark} KOLLA NODES"
+        block: |
+          10.0.1.11 node1
+          10.0.1.12 node2
+          10.0.1.13 node3
+
+    - name: Hostname conforme à l'inventaire
+      hostname:
+        name: "{{ inventory_hostname }}"
+
+    - name: Modules kernel pour Neutron / Docker
+      modprobe:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - br_netfilter
+        - nf_conntrack
+        - vhost_net
+
+    - name: Modules kernel persistants
+      copy:
+        dest: /etc/modules-load.d/kolla.conf
+        content: |
+          br_netfilter
+          nf_conntrack
+          vhost_net
+
+    - name: Sysctl Kolla
+      copy:
+        dest: /etc/sysctl.d/99-kolla.conf
+        content: |
+          net.ipv4.ip_forward = 1
+          net.bridge.bridge-nf-call-iptables = 1
+          net.bridge.bridge-nf-call-ip6tables = 1
+      notify: reload sysctl
+
+    - name: ENI ext (ens6) UP sans IP — netplan dropin
+      copy:
+        dest: /etc/netplan/60-kolla-ext.yaml
+        mode: '0600'
+        content: |
+          network:
+            version: 2
+            ethernets:
+              {{ ext_iface }}:
+                dhcp4: false
+                dhcp6: false
+                optional: true
+      notify: apply netplan
+
+    # --- VIP : uniquement sur le nœud désigné (node1) ---
+    - name: VIP en IP secondaire sur ens5 (node1 uniquement)
+      copy:
+        dest: /etc/netplan/61-kolla-vip.yaml
+        mode: '0600'
+        content: |
+          network:
+            version: 2
+            ethernets:
+              {{ mgmt_iface }}:
+                addresses:
+                  - {{ vip_address }}/24
+      when: vip_holder | default(false) | bool
+      notify: apply netplan
+
+  handlers:
+    - name: reload sysctl
+      command: sysctl --system
+
+    - name: apply netplan
+      command: netplan apply

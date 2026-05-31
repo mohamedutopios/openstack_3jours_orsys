@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod +x kolla-aio/scripts/*.sh)",
+      "Bash(zip -r kolla-aio.zip kolla-aio)",
+      "Bash(unzip -l kolla-aio.zip)",
+      "Bash(chmod +x kolla-aio-extend/scripts/*.sh)",
+      "Bash(zip -r kolla-aio-extend.zip kolla-aio-extend)",
+      "Bash(unzip -l kolla-aio-extend.zip)",
+      "Bash(chmod +x kolla-multinode-ec2/aws/*.sh kolla-multinode-ec2/scripts/*.sh)",
+      "Bash(zip -r kolla-multinode-ec2.zip kolla-multinode-ec2)",
+      "Bash(unzip -l kolla-multinode-ec2.zip)",
+      "Bash(/usr/bin/python3 -c \"from Quartz import PDFDocument; print\\('quartz ok'\\)\")",
+      "Bash(/usr/bin/python3 -c \"import Quartz.CoreGraphics as CG; print\\('cg ok'\\)\")",
+      "Bash(brew install *)",
+      "Bash(qpdf --empty --pages wso2-apim-module1.pdf wso2-apim-module2.pdf -- wso2-apim-modules-1-2.pdf)"
+    ]
+  }
+}

@@ -1,0 +1,60 @@
+---
+# =============================================================
+# Kolla-Ansible — globals.yml — Multinode 3 nodes EC2
+# Release : 2024.1 Caracal — Ubuntu 22.04
+# Topologie : 3 nodes collapsés (control + network + compute + storage)
+# =============================================================
+
+# --- Base ---
+kolla_base_distro: "ubuntu"
+openstack_release: "2024.1"
+
+# --- VIP : IP secondaire posée sur ens5 de node1 (cf. ansible/prep-hosts.yml) ---
+kolla_internal_vip_address: "10.0.1.10"
+
+# --- Interfaces réseau (Nitro EC2 → ens5/ens6) ---
+network_interface: "ens5"
+neutron_external_interface: "ens6"
+api_interface: "{{ network_interface }}"
+storage_interface: "{{ network_interface }}"
+tunnel_interface: "{{ network_interface }}"
+cluster_interface: "{{ network_interface }}"
+
+# --- HA control plane ---
+# Keepalived désactivé : VRRP/multicast non supporté en VPC AWS.
+# HAProxy reste actif (load balance API sur les 3 nodes via la VIP).
+enable_keepalived: "no"
+enable_haproxy: "yes"
+
+# --- Nova : QEMU (TCG) car les EC2 non-metal ne fournissent pas KVM ---
+nova_compute_virt_type: "qemu"
+
+# --- Services activés ---
+enable_keystone: "yes"
+enable_nova: "yes"
+enable_neutron: "yes"
+enable_horizon: "yes"
+enable_cinder: "yes"
+enable_swift: "yes"
+enable_barbican: "yes"
+enable_heat: "yes"
+enable_horizon_heat: "yes"
+
+# --- Cinder : LVM sur /dev/nvme1n1 (VG cinder-volumes) ---
+enable_cinder_backend_lvm: "yes"
+cinder_volume_group: "cinder-volumes"
+
+# --- Swift : devices identifiés par le label de FS ---
+swift_devices_match_mode: "strict"
+swift_devices_name: "KOLLA_SWIFT_DATA"
+
+# --- Neutron ---
+# ML2/OVS + VXLAN. MTU 1450 pour tenir dans le MTU EC2 (1500 - 50 octets VXLAN).
+neutron_plugin_agent: "openvswitch"
+neutron_global_physnet_mtu: 1450
+
+# --- Désactivations explicites (hors périmètre formation) ---
+enable_ironic: "no"
+enable_magnum: "no"
+enable_octavia: "no"
+enable_designate: "no"

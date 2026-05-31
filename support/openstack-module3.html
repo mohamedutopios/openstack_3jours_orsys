@@ -1,0 +1,2743 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 3 — Gestion du stockage (Swift &amp; Cinder)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0E1C33;
+    --blue: #0057B8;
+    --cyan: #00AEEF;
+    --light: #F5F7FA;
+    --white: #FFFFFF;
+    --gray: #6B7A8F;
+    --gray-light: #E5EAF0;
+    --green: #10B981;
+    --orange: #F59E0B;
+    --red: #EF4444;
+    --purple: #8B5CF6;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: #000;
+    color: var(--navy);
+    line-height: 1.5;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+  }
+  .deck {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+    overflow: hidden;
+  }
+  .slide {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.96);
+    width: min(92vw, calc(92vh * 16 / 9));
+    height: min(92vh, calc(92vw * 9 / 16));
+    aspect-ratio: 16 / 9;
+    background: var(--white);
+    border-radius: 16px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+    padding: 3.5% 4.5%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.45s ease, transform 0.45s ease;
+  }
+  .slide.active {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    pointer-events: auto;
+  }
+  .slide-number {
+    position: absolute;
+    bottom: 24px;
+    right: 32px;
+    font-size: 13px;
+    color: var(--gray);
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .brand-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 6px;
+    background: linear-gradient(90deg, var(--navy) 0%, var(--blue) 50%, var(--cyan) 100%);
+  }
+  .brand-tag {
+    position: absolute;
+    bottom: 24px;
+    left: 32px;
+    font-size: 12px;
+    color: var(--gray);
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  h1 { font-size: 38px; font-weight: 800; color: var(--navy); line-height: 1.15; margin-bottom: 14px; }
+  h2 { font-size: 28px; font-weight: 700; color: var(--navy); margin-bottom: 20px; line-height: 1.2; }
+  h3 { font-size: 18px; font-weight: 700; color: var(--blue); margin-bottom: 10px; }
+  h4 { font-size: 14px; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
+  p { font-size: 14px; color: var(--navy); margin-bottom: 10px; }
+  .subtitle { font-size: 16px; color: var(--gray); font-weight: 400; margin-bottom: 18px; }
+  ul { list-style: none; }
+  li {
+    font-size: 13px;
+    padding: 4px 0 4px 22px;
+    position: relative;
+    color: var(--navy);
+    line-height: 1.45;
+  }
+  li::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 12px;
+    width: 7px; height: 7px;
+    background: var(--cyan);
+    border-radius: 50%;
+  }
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--gray-light);
+    color: var(--navy);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .code {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--navy);
+    color: var(--cyan);
+    padding: 14px 18px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.65;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .code.small { font-size: 11px; line-height: 1.55; padding: 12px 16px; }
+  .grid-2 > div > pre.code,
+  .grid-3 > div > pre.code,
+  .grid-2-1 > div > pre.code,
+  .grid-1-2 > div > pre.code { max-height: 100%; overflow: auto; }
+  .code .kw { color: #FF7AB6; }
+  .code .str { color: #A5E075; }
+  .code .cm { color: #7B8CA8; font-style: italic; }
+  .code .var { color: #FFD580; }
+  .code .num,
+  pre.code .num,
+  pre .num {
+    color: #FFA0A0 !important;
+    display: inline !important;
+    width: auto !important;
+    height: auto !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-weight: normal !important;
+    font-family: inherit !important;
+    font-size: inherit !important;
+    align-items: initial !important;
+    justify-content: initial !important;
+    line-height: inherit !important;
+  }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex: 1; min-height: 0; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; flex: 1; min-height: 0; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; flex: 1; min-height: 0; }
+  .grid-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; flex: 1; min-height: 0; }
+  .grid-1-2 { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; flex: 1; min-height: 0; }
+  .card {
+    background: var(--light);
+    border-radius: 10px;
+    padding: 16px;
+    border-left: 4px solid var(--blue);
+  }
+  .card.cyan { border-left-color: var(--cyan); }
+  .card.navy { border-left-color: var(--navy); }
+  .card.green { border-left-color: var(--green); }
+  .card.orange { border-left-color: var(--orange); }
+  .card.purple { border-left-color: var(--purple); }
+  .card.red { border-left-color: var(--red); }
+  .badge {
+    display: inline-block;
+    background: var(--cyan);
+    color: var(--white);
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .badge.blue { background: var(--blue); }
+  .badge.navy { background: var(--navy); }
+  .badge.green { background: var(--green); }
+  .badge.orange { background: var(--orange); }
+  .badge.purple { background: var(--purple); }
+  .badge.red { background: var(--red); }
+  .module-tag {
+    display: inline-block;
+    background: rgba(0, 174, 239, 0.12);
+    color: var(--blue);
+    padding: 5px 12px;
+    border-radius: 14px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .title-slide {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
+    color: var(--white);
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .title-slide h1 { color: var(--white); font-size: 54px; }
+  .title-slide .subtitle { color: rgba(255,255,255,0.85); font-size: 20px; }
+  .title-slide .brand-tag { color: rgba(255,255,255,0.6); }
+  .title-slide .slide-number { color: rgba(255,255,255,0.5); }
+  .title-slide .module-tag {
+    background: rgba(0, 174, 239, 0.25);
+    color: var(--cyan);
+  }
+  .decorative-circle {
+    position: absolute;
+    border-radius: 50%;
+    opacity: 0.08;
+    background: var(--cyan);
+  }
+  .diagram { width: 100%; height: 100%; }
+  .diagram-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 0;
+    min-height: 0;
+  }
+  text { font-family: 'Plus Jakarta Sans', sans-serif; }
+  .divider {
+    background: var(--navy);
+    color: var(--white);
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+  }
+  .divider h1 { color: var(--white); font-size: 60px; }
+  .divider .subtitle { color: var(--cyan); }
+  .divider .brand-tag, .divider .slide-number { color: rgba(255,255,255,0.5); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: var(--navy); color: var(--white); padding: 8px 10px; text-align: left; font-weight: 600; font-size: 12px; }
+  td { padding: 7px 10px; border-bottom: 1px solid var(--gray-light); font-size: 12px; }
+  tr:nth-child(even) td { background: var(--light); }
+  .check { color: var(--green); font-weight: 700; }
+  .cross { color: var(--red); font-weight: 700; }
+  .pill {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 9px;
+    font-size: 10px;
+    font-weight: 600;
+    background: var(--gray-light);
+    color: var(--navy);
+    margin-right: 4px;
+  }
+  .pill.cyan { background: rgba(0,174,239,0.15); color: var(--blue); }
+  .pill.green { background: rgba(16,185,129,0.15); color: #047857; }
+  .pill.orange { background: rgba(245,158,11,0.15); color: #B45309; }
+  .pill.red { background: rgba(239,68,68,0.15); color: #B91C1C; }
+  .pill.purple { background: rgba(139,92,246,0.15); color: #6D28D9; }
+  .num {
+    display: inline-flex;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--blue);
+    color: var(--white);
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 12px;
+    margin-right: 8px;
+  }
+  .num.cyan { background: var(--cyan); }
+  .num.navy { background: var(--navy); }
+  .stat { text-align: center; }
+  .stat-num { font-size: 36px; font-weight: 800; color: var(--blue); line-height: 1; }
+  .stat-label { font-size: 12px; color: var(--gray); margin-top: 6px; }
+  .info-box {
+    background: var(--light);
+    border-left: 4px solid var(--cyan);
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-top: 12px;
+  }
+  .info-box.navy {
+    background: var(--navy);
+    color: var(--white);
+    border-left-color: var(--cyan);
+  }
+  .info-box.navy p, .info-box.navy strong { color: var(--white); }
+  .info-box.navy .accent { color: var(--cyan); }
+  .info-box.warning {
+    background: rgba(245, 158, 11, 0.08);
+    border-left-color: var(--orange);
+  }
+  .info-box p { margin: 0; font-size: 12px; }
+
+  /* Controls */
+  .controls {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    background: rgba(14, 28, 51, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 8px 12px;
+    border-radius: 999px;
+    z-index: 1000;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .deck:hover .controls,
+  .controls:hover,
+  .controls.show { opacity: 1; }
+  .ctrl-btn {
+    background: transparent;
+    border: none;
+    color: white;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    font-size: 15px;
+  }
+  .ctrl-btn:hover { background: rgba(255,255,255,0.15); }
+  .ctrl-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .ctrl-counter {
+    color: white;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    padding: 0 12px;
+    min-width: 70px;
+    text-align: center;
+    user-select: none;
+  }
+  .ctrl-counter input {
+    width: 32px;
+    background: transparent;
+    border: none;
+    color: white;
+    font-family: inherit;
+    font-size: inherit;
+    text-align: right;
+    outline: none;
+    border-bottom: 1px solid transparent;
+  }
+  .ctrl-counter input:focus { border-bottom-color: var(--cyan); }
+  .progress {
+    position: fixed;
+    top: 0; left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--blue), var(--cyan));
+    z-index: 1001;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 10px rgba(0, 174, 239, 0.6);
+  }
+  .deck.overview {
+    overflow-y: auto;
+    background: #0a1220;
+    padding: 60px 40px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 24px;
+  }
+  .deck.overview .slide {
+    position: relative;
+    top: auto; left: auto;
+    transform: none;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16/9;
+    opacity: 1;
+    pointer-events: auto;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .deck.overview .slide:hover {
+    transform: scale(1.02);
+    box-shadow: 0 12px 32px rgba(0, 174, 239, 0.3);
+  }
+  .deck.overview .slide.active {
+    outline: 3px solid var(--cyan);
+    outline-offset: 4px;
+  }
+  .hint {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(14, 28, 51, 0.85);
+    backdrop-filter: blur(10px);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-size: 12px;
+    z-index: 1000;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  .hint.show { opacity: 1; }
+  .hint kbd {
+    background: rgba(255,255,255,0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    margin: 0 2px;
+  }
+  @media print {
+    html, body { background: white; overflow: visible; height: auto; }
+    .deck { display: block; height: auto; width: auto; }
+    .slide {
+      position: relative;
+      top: auto; left: auto;
+      transform: none;
+      width: 100%;
+      page-break-after: always;
+      box-shadow: none;
+      opacity: 1 !important;
+      pointer-events: auto !important;
+      border-radius: 0;
+    }
+    .controls, .progress, .hint { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<div class="hint" id="hint">
+  <kbd>←</kbd> <kbd>→</kbd> naviguer &nbsp;·&nbsp; <kbd>F</kbd> plein écran &nbsp;·&nbsp; <kbd>O</kbd> vue d'ensemble
+</div>
+<div class="deck" id="deck">
+
+<!-- ============================ SLIDE 1 — TITRE ============================ -->
+<div class="slide title-slide">
+  <div class="brand-bar"></div>
+  <div class="decorative-circle" style="width: 400px; height: 400px; top: -100px; right: -100px;"></div>
+  <div class="decorative-circle" style="width: 250px; height: 250px; bottom: -80px; left: -80px;"></div>
+  <span class="module-tag">Module 3 / 7</span>
+  <h1>Gestion<br/>du stockage</h1>
+  <p class="subtitle">Object storage avec Swift, block storage avec Cinder, backends et pools — déploiement et exploitation via Kolla-Ansible</p>
+  <div style="margin-top: 30px; display: flex; gap: 40px;">
+    <div>
+      <div style="font-size: 11px; opacity: 0.7; text-transform: uppercase; letter-spacing: 1px;">Object storage</div>
+      <div style="font-size: 22px; font-weight: 700; margin-top: 4px;">OpenStack Swift</div>
+    </div>
+    <div>
+      <div style="font-size: 11px; opacity: 0.7; text-transform: uppercase; letter-spacing: 1px;">Block storage</div>
+      <div style="font-size: 22px; font-weight: 700; margin-top: 4px;">OpenStack Cinder</div>
+    </div>
+    <div>
+      <div style="font-size: 11px; opacity: 0.7; text-transform: uppercase; letter-spacing: 1px;">TP final</div>
+      <div style="font-size: 22px; font-weight: 700; margin-top: 4px;">Gestion Cinder</div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Formation OpenStack</div>
+  <div class="slide-number">01 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 2 — SOMMAIRE ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">Plan du module</span>
+  <h1>Sommaire</h1>
+  <div class="grid-2" style="margin-top: 16px;">
+    <div>
+      <div class="card cyan" style="margin-bottom: 12px;">
+        <h3><span class="num cyan">1</span>Stockage dans OpenStack</h3>
+        <p style="font-size: 12px; margin-left: 36px;">Object, block, fichier : trois modèles, trois projets (Swift, Cinder, Manila)</p>
+      </div>
+      <div class="card" style="margin-bottom: 12px;">
+        <h3><span class="num">2</span>Swift : architecture et concepts</h3>
+        <p style="font-size: 12px; margin-left: 36px;">Proxy, anneau (ring), accounts/containers/objects, réplication, eventual consistency</p>
+      </div>
+      <div class="card navy" style="margin-bottom: 12px;">
+        <h3><span class="num navy">3</span>Swift via Kolla-Ansible</h3>
+        <p style="font-size: 12px; margin-left: 36px;">globals.yml, génération des rings, pools de stockage, opérations admin et client</p>
+      </div>
+    </div>
+    <div>
+      <div class="card orange" style="margin-bottom: 12px;">
+        <h3><span class="num" style="background: var(--orange);">4</span>Cinder : architecture du block</h3>
+        <p style="font-size: 12px; margin-left: 36px;">api, scheduler, volume, backup ; cycle de vie d'un volume ; attachement aux VM</p>
+      </div>
+      <div class="card purple" style="margin-bottom: 12px;">
+        <h3><span class="num" style="background: var(--purple);">5</span>Backends Cinder</h3>
+        <p style="font-size: 12px; margin-left: 36px;">LVM, Ceph RBD, NFS, iSCSI, baies SAN, drivers commerciaux ; multi-backend</p>
+      </div>
+      <div class="card green" style="margin-bottom: 12px;">
+        <h3><span class="num" style="background: var(--green);">6</span>Volume types, QoS, snapshots</h3>
+        <p style="font-size: 12px; margin-left: 36px;">Routage par scheduler, qualité de service, snapshots, backups, retype</p>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">02 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 3 — VUE D'ENSEMBLE STOCKAGE ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">1. Stockage dans OpenStack</span>
+  <h1>Trois modèles de stockage</h1>
+  <p class="subtitle">Object, block, fichier : on choisit selon l'usage, pas l'inverse</p>
+  <div class="grid-3" style="margin-top: 8px;">
+    <div class="card cyan">
+      <span class="badge">Object</span>
+      <h3>Swift</h3>
+      <p style="font-size: 12px;">Stocke des <strong>objets</strong> (fichiers + métadonnées) accessibles via HTTP REST. Pas de système de fichiers, pas de hiérarchie réelle, scalable à l'infini.</p>
+      <ul style="margin-top: 8px;">
+        <li>Backups</li>
+        <li>Images Glance</li>
+        <li>Archives, médias</li>
+        <li>Logs applicatifs</li>
+        <li>Données web statiques</li>
+      </ul>
+      <div class="info-box" style="margin-top: 8px; padding: 8px 12px;">
+        <p style="font-size: 11px;"><strong>API native :</strong> Swift API + S3 compatible</p>
+      </div>
+    </div>
+    <div class="card orange">
+      <span class="badge orange">Block</span>
+      <h3>Cinder</h3>
+      <p style="font-size: 12px;">Provisionne des <strong>volumes</strong> attachables à des VM Nova comme des disques durs. Très bonnes performances I/O, exclusif (un volume = une VM).</p>
+      <ul style="margin-top: 8px;">
+        <li>Disque système des VM</li>
+        <li>Bases de données</li>
+        <li>Volumes data persistants</li>
+        <li>Stockage Kubernetes (CSI)</li>
+        <li>Boot from volume</li>
+      </ul>
+      <div class="info-box" style="margin-top: 8px; padding: 8px 12px;">
+        <p style="font-size: 11px;"><strong>Backends :</strong> Ceph, LVM, NetApp, Pure, EMC…</p>
+      </div>
+    </div>
+    <div class="card purple">
+      <span class="badge purple">Fichier</span>
+      <h3>Manila</h3>
+      <p style="font-size: 12px;">Fournit des <strong>partages de fichiers</strong> (NFS, CIFS, CephFS) accessibles depuis plusieurs VM simultanément.</p>
+      <ul style="margin-top: 8px;">
+        <li>Home dirs partagés</li>
+        <li>Sauvegardes mutualisées</li>
+        <li>Échange entre microservices</li>
+        <li>Lift-and-shift apps legacy</li>
+      </ul>
+      <div class="info-box" style="margin-top: 8px; padding: 8px 12px;">
+        <p style="font-size: 11px;"><strong>Backends :</strong> CephFS, NetApp, GlusterFS</p>
+      </div>
+    </div>
+  </div>
+  <div class="info-box navy" style="margin-top: 14px;">
+    <p>💡 <strong>Ce module couvre Swift et Cinder</strong>, les deux briques de stockage les plus utilisées. Manila est abordée brièvement en fin de module.</p>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">03 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 4 — COMPARAISON DETAILLEE ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">1. Stockage dans OpenStack</span>
+  <h1>Object vs Block : comparaison détaillée</h1>
+  <div style="flex: 1; overflow: auto; margin-top: 8px;">
+    <table>
+      <thead>
+        <tr><th style="width: 25%;">Critère</th><th>Swift (object)</th><th>Cinder (block)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Granularité</strong></td><td>Objet complet (fichier entier)</td><td>Bloc (LBA)</td></tr>
+        <tr><td><strong>Accès</strong></td><td>HTTP REST (PUT/GET/DELETE)</td><td>iSCSI, RBD, FC : attaché en local à la VM</td></tr>
+        <tr><td><strong>Modèle de cohérence</strong></td><td>Eventual consistency</td><td>Strong consistency (POSIX)</td></tr>
+        <tr><td><strong>Concurrence</strong></td><td>Plusieurs clients simultanément</td><td>Exclusif (un volume = une VM)</td></tr>
+        <tr><td><strong>Performances</strong></td><td>Throughput élevé, latence haute (HTTP)</td><td>IOPS élevés, latence basse (μs)</td></tr>
+        <tr><td><strong>Taille</strong></td><td>Objets jusqu'à 5 GB (5 TB en SLO)</td><td>Volumes jusqu'à plusieurs TB</td></tr>
+        <tr><td><strong>Modification</strong></td><td>Pas de modification partielle : on remplace l'objet</td><td>Modification au niveau bloc (R/W)</td></tr>
+        <tr><td><strong>Durabilité</strong></td><td>Réplication 3x ou erasure coding</td><td>RAID + réplication backend</td></tr>
+        <tr><td><strong>Scaling</strong></td><td>Horizontal massif (PB)</td><td>Limité par le backend</td></tr>
+        <tr><td><strong>Coût/Go</strong></td><td>Faible (HDD, eC)</td><td>Plus élevé (SSD, réplication)</td></tr>
+        <tr><td><strong>Cas typique</strong></td><td>Backups, médias, logs froids, images</td><td>BDD, OS de VM, fichiers actifs</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">04 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 5 — DIVIDER SWIFT ============================ -->
+<div class="slide divider">
+  <div class="brand-bar"></div>
+  <div class="decorative-circle" style="width: 500px; height: 500px; top: -150px; right: -150px;"></div>
+  <span class="module-tag">Chapitre 2</span>
+  <h1>Swift<br/>Architecture &amp; concepts</h1>
+  <p class="subtitle" style="margin-top: 20px;">Le stockage objet d'OpenStack</p>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">05 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 6 — SWIFT EN BREF ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">2. Swift : architecture</span>
+  <h1>Swift en quelques mots</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🎯 Principes</h3>
+      <ul>
+        <li><strong>Stockage objet distribué</strong> : aucun nœud central, scalabilité horizontale</li>
+        <li><strong>Eventually consistent</strong> : les écritures se propagent, on accepte une fenêtre de désynchronisation</li>
+        <li><strong>Multi-zone</strong> : tolère la perte de racks, salles ou datacenters entiers</li>
+        <li><strong>API REST</strong> : compatible Amazon S3 (extension <code>swift3</code> / native)</li>
+        <li><strong>Pas de hiérarchie réelle</strong> : trois niveaux fixes : account / container / object</li>
+        <li>Stocke depuis quelques Go jusqu'à <strong>plusieurs PB</strong></li>
+      </ul>
+    </div>
+    <div>
+      <h3>🧱 Hiérarchie logique</h3>
+      <div class="diagram-container" style="padding: 0;">
+        <svg viewBox="0 0 500 280" class="diagram">
+          <rect x="20" y="20" width="460" height="60" rx="8" fill="#0E1C33"/>
+          <text x="250" y="46" text-anchor="middle" fill="white" font-size="14" font-weight="700">Account (= projet OpenStack)</text>
+          <text x="250" y="66" text-anchor="middle" fill="#00AEEF" font-size="11">AUTH_a1b2c3... / quotas, métadonnées globales</text>
+
+          <line x1="120" y1="80" x2="120" y2="105" stroke="#6B7A8F" stroke-width="2"/>
+          <line x1="250" y1="80" x2="250" y2="105" stroke="#6B7A8F" stroke-width="2"/>
+          <line x1="380" y1="80" x2="380" y2="105" stroke="#6B7A8F" stroke-width="2"/>
+
+          <rect x="35" y="105" width="170" height="50" rx="6" fill="#0057B8"/>
+          <text x="120" y="128" text-anchor="middle" fill="white" font-size="12" font-weight="700">Container "backups"</text>
+          <text x="120" y="145" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="10">ACL, métadonnées</text>
+
+          <rect x="220" y="105" width="170" height="50" rx="6" fill="#0057B8"/>
+          <text x="305" y="128" text-anchor="middle" fill="white" font-size="12" font-weight="700">Container "logs"</text>
+          <text x="305" y="145" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="10">Versioning, expiration</text>
+
+          <rect x="380" y="105" width="100" height="50" rx="6" fill="#0057B8"/>
+          <text x="430" y="128" text-anchor="middle" fill="white" font-size="11" font-weight="700">"images"</text>
+          <text x="430" y="145" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="10">CDN-enabled</text>
+
+          <line x1="120" y1="155" x2="120" y2="180" stroke="#6B7A8F" stroke-width="2"/>
+          <line x1="305" y1="155" x2="305" y2="180" stroke="#6B7A8F" stroke-width="2"/>
+
+          <rect x="35" y="180" width="170" height="80" rx="6" fill="#00AEEF"/>
+          <text x="120" y="200" text-anchor="middle" fill="white" font-size="11" font-weight="700">Object</text>
+          <text x="120" y="218" text-anchor="middle" fill="rgba(255,255,255,0.95)" font-size="10">db-2024.tar.gz</text>
+          <text x="120" y="234" text-anchor="middle" fill="rgba(255,255,255,0.95)" font-size="10">3.2 GB</text>
+          <text x="120" y="250" text-anchor="middle" fill="rgba(255,255,255,0.95)" font-size="10">Content-Type, metadata</text>
+
+          <rect x="220" y="180" width="170" height="80" rx="6" fill="#00AEEF"/>
+          <text x="305" y="200" text-anchor="middle" fill="white" font-size="11" font-weight="700">Object</text>
+          <text x="305" y="218" text-anchor="middle" fill="rgba(255,255,255,0.95)" font-size="10">access-2024-12-01.log</text>
+          <text x="305" y="234" text-anchor="middle" fill="rgba(255,255,255,0.95)" font-size="10">128 MB</text>
+          <text x="305" y="250" text-anchor="middle" fill="rgba(255,255,255,0.95)" font-size="10">X-Delete-At</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">06 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 7 — ARCHITECTURE SWIFT ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">2. Swift : architecture</span>
+  <h1>Architecture des services Swift</h1>
+  <div class="diagram-container">
+    <svg viewBox="0 0 1200 440" class="diagram">
+      <!-- Top: clients -->
+      <rect x="30" y="20" width="1140" height="48" rx="8" fill="#0E1C33"/>
+      <text x="600" y="48" text-anchor="middle" fill="white" font-size="13" font-weight="700">Clients : python-swiftclient • boto3 (S3) • curl • Horizon • Glance • Cinder-backup • Trove</text>
+
+      <!-- Load balancer -->
+      <rect x="450" y="90" width="300" height="40" rx="6" fill="#00AEEF"/>
+      <text x="600" y="115" text-anchor="middle" fill="white" font-size="12" font-weight="700">Load Balancer (HAProxy via Kolla)</text>
+
+      <!-- Proxy layer -->
+      <rect x="30" y="160" width="1140" height="80" rx="8" fill="#0057B8"/>
+      <text x="600" y="184" text-anchor="middle" fill="white" font-size="14" font-weight="700">Proxy tier — swift-proxy-server (stateless)</text>
+      <text x="600" y="206" text-anchor="middle" fill="rgba(255,255,255,0.95)" font-size="11">Authentification (Keystone) • Routage via Ring • Pipeline middleware (versioning, tempurl, quotas, S3 API)</text>
+      <text x="600" y="226" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="10">Port 8080 — scalable horizontalement</text>
+
+      <line x1="200" y1="240" x2="200" y2="280" stroke="#6B7A8F" stroke-width="2"/>
+      <line x1="600" y1="240" x2="600" y2="280" stroke="#6B7A8F" stroke-width="2"/>
+      <line x1="1000" y1="240" x2="1000" y2="280" stroke="#6B7A8F" stroke-width="2"/>
+
+      <!-- Storage tier: account, container, object -->
+      <rect x="30" y="280" width="360" height="120" rx="8" fill="#F5F7FA" stroke="#0057B8" stroke-width="2"/>
+      <text x="210" y="305" text-anchor="middle" fill="#0E1C33" font-size="13" font-weight="700">Account servers</text>
+      <text x="210" y="324" text-anchor="middle" fill="#6B7A8F" font-size="11">swift-account-server</text>
+      <text x="210" y="342" text-anchor="middle" fill="#6B7A8F" font-size="10">SQLite : liste des containers</text>
+      <text x="210" y="360" text-anchor="middle" fill="#6B7A8F" font-size="10">par account (= projet)</text>
+      <text x="210" y="384" text-anchor="middle" fill="#0057B8" font-size="10">+ replicator, auditor, reaper</text>
+
+      <rect x="420" y="280" width="360" height="120" rx="8" fill="#F5F7FA" stroke="#0057B8" stroke-width="2"/>
+      <text x="600" y="305" text-anchor="middle" fill="#0E1C33" font-size="13" font-weight="700">Container servers</text>
+      <text x="600" y="324" text-anchor="middle" fill="#6B7A8F" font-size="11">swift-container-server</text>
+      <text x="600" y="342" text-anchor="middle" fill="#6B7A8F" font-size="10">SQLite : liste des objets</text>
+      <text x="600" y="360" text-anchor="middle" fill="#6B7A8F" font-size="10">par container</text>
+      <text x="600" y="384" text-anchor="middle" fill="#0057B8" font-size="10">+ replicator, updater, auditor</text>
+
+      <rect x="810" y="280" width="360" height="120" rx="8" fill="#F5F7FA" stroke="#0057B8" stroke-width="2"/>
+      <text x="990" y="305" text-anchor="middle" fill="#0E1C33" font-size="13" font-weight="700">Object servers</text>
+      <text x="990" y="324" text-anchor="middle" fill="#6B7A8F" font-size="11">swift-object-server</text>
+      <text x="990" y="342" text-anchor="middle" fill="#6B7A8F" font-size="10">Fichiers binaires sur XFS</text>
+      <text x="990" y="360" text-anchor="middle" fill="#6B7A8F" font-size="10">un fichier par objet + extended attrs</text>
+      <text x="990" y="384" text-anchor="middle" fill="#0057B8" font-size="10">+ replicator, updater, auditor, reconstructor</text>
+    </svg>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">07 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 8 — RING ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">2. Swift : architecture</span>
+  <h1>Le Ring : cœur de Swift</h1>
+  <div class="grid-2-1" style="margin-top: 8px;">
+    <div>
+      <h3>🎯 Rôle du Ring</h3>
+      <ul>
+        <li>Mapping <strong>déterministe</strong> : pour un objet donné, dire sur quels disques il vit</li>
+        <li>Hashing cohérent : <code>md5(path)</code> → partition → liste de disques</li>
+        <li>Trois rings indépendants : <strong>account</strong>, <strong>container</strong>, <strong>object</strong></li>
+        <li>Distribué à <strong>tous</strong> les nœuds (proxy + storage), identique partout</li>
+        <li>Modifié uniquement via <code>swift-ring-builder</code></li>
+      </ul>
+      <h3 style="margin-top: 12px;">🧩 Concepts du Ring</h3>
+      <ul>
+        <li><strong>Partition</strong> : unité logique (typiquement 2¹⁸ = 262 144 partitions)</li>
+        <li><strong>Replica</strong> : copie d'une partition (3 par défaut)</li>
+        <li><strong>Zone</strong> : groupe de disques tolérant pannes (rack, salle…)</li>
+        <li><strong>Region</strong> : groupe de zones (datacenter)</li>
+        <li><strong>Device</strong> : un disque physique sur un node</li>
+        <li><strong>Weight</strong> : poids relatif d'un device dans la distribution</li>
+      </ul>
+    </div>
+    <div>
+      <h3>🔍 Workflow</h3>
+      <div class="diagram-container" style="padding: 0;">
+        <svg viewBox="0 0 380 360" class="diagram">
+          <rect x="30" y="20" width="320" height="42" rx="6" fill="#0E1C33"/>
+          <text x="190" y="40" text-anchor="middle" fill="white" font-size="11" font-weight="700">PUT /AUTH_xxx/bk/db.tar.gz</text>
+          <text x="190" y="55" text-anchor="middle" fill="#00AEEF" font-size="9">au proxy</text>
+
+          <line x1="190" y1="62" x2="190" y2="82" stroke="#0057B8" stroke-width="2" marker-end="url(#a1)"/>
+          <defs>
+            <marker id="a1" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto">
+              <polygon points="0,0 4,8 8,0" fill="#0057B8"/>
+            </marker>
+          </defs>
+
+          <rect x="30" y="80" width="320" height="60" rx="6" fill="#0057B8"/>
+          <text x="190" y="100" text-anchor="middle" fill="white" font-size="11" font-weight="700">md5(/AUTH_xxx/bk/db.tar.gz)</text>
+          <text x="190" y="116" text-anchor="middle" fill="rgba(255,255,255,0.95)" font-size="10">→ partition = N</text>
+          <text x="190" y="132" text-anchor="middle" fill="rgba(255,255,255,0.95)" font-size="10">→ ring.get_part_nodes(N)</text>
+
+          <line x1="190" y1="140" x2="190" y2="160" stroke="#0057B8" stroke-width="2" marker-end="url(#a1)"/>
+
+          <rect x="30" y="160" width="320" height="60" rx="6" fill="#00AEEF"/>
+          <text x="190" y="180" text-anchor="middle" fill="white" font-size="11" font-weight="700">3 devices :</text>
+          <text x="190" y="196" text-anchor="middle" fill="rgba(255,255,255,0.95)" font-size="10">[z1/d3, z2/d7, z3/d1]</text>
+          <text x="190" y="212" text-anchor="middle" fill="rgba(255,255,255,0.95)" font-size="10">3 zones différentes</text>
+
+          <line x1="190" y1="220" x2="190" y2="240" stroke="#0057B8" stroke-width="2" marker-end="url(#a1)"/>
+
+          <rect x="30" y="240" width="320" height="100" rx="6" fill="#10B981"/>
+          <text x="190" y="262" text-anchor="middle" fill="white" font-size="11" font-weight="700">PUT en parallèle aux 3 nodes</text>
+          <text x="190" y="282" text-anchor="middle" fill="rgba(255,255,255,0.95)" font-size="10">Quorum &gt;= 2 succès → 201 Created</text>
+          <text x="190" y="302" text-anchor="middle" fill="rgba(255,255,255,0.95)" font-size="10">3e replica récupérée par</text>
+          <text x="190" y="318" text-anchor="middle" fill="rgba(255,255,255,0.95)" font-size="10">replicator en arrière-plan</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">08 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 9 — REPLICATION & EVENTUAL CONSISTENCY ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">2. Swift : architecture</span>
+  <h1>Réplication et eventual consistency</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🔄 Processus de réplication</h3>
+      <ul>
+        <li><strong>replicator</strong> compare en continu les hashes des partitions entre nodes (rsync ou ssync)</li>
+        <li>Si un disque tombe, ses partitions sont reconstruites ailleurs depuis les autres répliques</li>
+        <li><strong>auditor</strong> détecte la corruption silencieuse (bit-rot) et marque le fichier "quarantined"</li>
+        <li><strong>updater</strong> rejoue les opérations en échec (mise à jour container/account différée)</li>
+        <li><strong>reaper</strong> nettoie les accounts supprimés</li>
+      </ul>
+      <h3 style="margin-top: 12px;">⚖️ Quorum</h3>
+      <p style="font-size: 12px;">Avec <code>R=3</code> répliques, le quorum d'écriture est <code>W=2</code>. La lecture peut tomber sur une partition pas encore synchronisée — Swift fait alors fallback sur une autre réplique.</p>
+    </div>
+    <div>
+      <h3>⚠️ Eventual consistency</h3>
+      <div class="info-box warning">
+        <p>Après un PUT, une lecture immédiate peut renvoyer la version précédente sur quelques secondes. Pour les usages où ce comportement n'est pas acceptable (cache code, config-runtime), <strong>Cinder est un meilleur choix</strong>.</p>
+      </div>
+      <h3 style="margin-top: 12px;">🧮 Erasure Coding (alternative)</h3>
+      <ul>
+        <li>À la place de N répliques complètes, on découpe l'objet en <strong>k+m fragments</strong></li>
+        <li>k fragments = données, m = parité (Reed-Solomon)</li>
+        <li>Exemple : <strong>EC 8+4</strong> tolère 4 pertes pour 1.5× la taille (vs 3× en réplication)</li>
+        <li>Économie d'espace, latence accrue, idéal pour objets > 1 Mo</li>
+        <li>Configuré par <strong>storage policy</strong> au niveau du container</li>
+      </ul>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">09 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 10 — DIVIDER SWIFT KOLLA ============================ -->
+<div class="slide divider">
+  <div class="brand-bar"></div>
+  <div class="decorative-circle" style="width: 500px; height: 500px; bottom: -150px; left: -150px;"></div>
+  <span class="module-tag">Chapitre 3</span>
+  <h1>Swift<br/>via Kolla-Ansible</h1>
+  <p class="subtitle" style="margin-top: 20px;">Déploiement, configuration et gestion des pools</p>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">10 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 11 — INVENTAIRE SWIFT ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">3. Swift via Kolla</span>
+  <h1>Inventaire et placement des services</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>📋 Groupes Kolla pour Swift</h3>
+      <pre class="code small"><span class="cm"># /etc/kolla/multinode</span>
+[swift-proxy-server:children]
+control
+
+[swift-account-server:children]
+storage
+
+[swift-container-server:children]
+storage
+
+[swift-object-server:children]
+storage
+
+[storage]
+storage-01 ansible_host=<span class="num">10.10.0.31</span>
+storage-02 ansible_host=<span class="num">10.10.0.32</span>
+storage-03 ansible_host=<span class="num">10.10.0.33</span></pre>
+      <div class="info-box">
+        <p>Bonne pratique : <strong>3 storage nodes minimum</strong> (1 par zone), chacun avec plusieurs disques dédiés (XFS) montés sous <code>/srv/node/&lt;dev&gt;</code>.</p>
+      </div>
+    </div>
+    <div>
+      <h3>💾 Préparation des disques sur les storage</h3>
+      <pre class="code small"><span class="cm"># Sur chaque storage-XX</span>
+
+<span class="cm"># 1. Identifier les disques</span>
+<span class="kw">lsblk</span> -d -o NAME,SIZE,TYPE
+<span class="cm"># sdb 4T disk</span>
+<span class="cm"># sdc 4T disk</span>
+
+<span class="cm"># 2. Formater en XFS (recommandé Swift)</span>
+<span class="kw">mkfs.xfs</span> -L swift_d1 -i size=<span class="num">1024</span> -n size=<span class="num">8192</span> /dev/sdb
+<span class="kw">mkfs.xfs</span> -L swift_d2 -i size=<span class="num">1024</span> -n size=<span class="num">8192</span> /dev/sdc
+
+<span class="cm"># 3. Créer les points de montage</span>
+<span class="kw">mkdir</span> -p /srv/node/d1 /srv/node/d2
+
+<span class="cm"># 4. fstab : noatime + nodiratime + nobarrier</span>
+<span class="kw">cat</span> &gt;&gt; /etc/fstab &lt;&lt;<span class="str">EOF</span>
+LABEL=swift_d1 /srv/node/d1 xfs noatime,nodiratime 0 2
+LABEL=swift_d2 /srv/node/d2 xfs noatime,nodiratime 0 2
+<span class="str">EOF</span>
+
+<span class="kw">mount</span> -a
+<span class="kw">chown</span> -R kolla:kolla /srv/node</pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">11 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 12 — GLOBALS.YML SWIFT ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">3. Swift via Kolla</span>
+  <h1>globals.yml — variables Swift</h1>
+  <pre class="code small" style="flex: 1; overflow: auto;"><span class="cm">################################################################
+# /etc/kolla/globals.yml — extraits Swift
+################################################################</span>
+
+<span class="cm"># Activation du service</span>
+<span class="kw">enable_swift</span>: <span class="str">"yes"</span>
+<span class="kw">enable_swift_s3api</span>: <span class="str">"yes"</span>          <span class="cm"># Active l'API S3 (boto3, awscli)</span>
+<span class="kw">enable_swift_recon</span>: <span class="str">"yes"</span>          <span class="cm"># Endpoint monitoring local</span>
+
+<span class="cm"># Topologie des devices Swift</span>
+<span class="cm"># Décrit la disposition physique vue par les rings</span>
+<span class="kw">swift_devices_match_mode</span>: <span class="str">"strict"</span>
+<span class="kw">swift_devices_name</span>: <span class="str">"KOLLA_SWIFT_DATA"</span>
+
+<span class="cm"># Nombre de répliques (3 = standard, 2 = lab)</span>
+<span class="kw">swift_replication_count</span>: <span class="num">3</span>
+
+<span class="cm"># Politique de stockage par défaut</span>
+<span class="cm"># replication | erasure_coding</span>
+<span class="kw">swift_default_storage_policy</span>: <span class="str">"replication"</span>
+
+<span class="cm"># Tailles partition (2^18 par défaut)</span>
+<span class="kw">swift_part_power</span>: <span class="num">18</span>
+
+<span class="cm"># Compression et pipeline middleware</span>
+<span class="kw">swift_extras</span>:
+  - <span class="kw">name</span>: <span class="str">"middlewares"</span>
+    <span class="kw">enabled</span>: <span class="str">"true"</span>
+
+<span class="cm"># Hash prefix/suffix (clé partagée par le cluster)
+# Générée automatiquement par Kolla dans passwords.yml :
+#   swift_hash_path_suffix, swift_hash_path_prefix</span>
+
+<span class="cm"># Quota par projet : géré côté API</span>
+<span class="kw">swift_account_quotas_enabled</span>: <span class="str">"yes"</span>
+<span class="kw">swift_container_quotas_enabled</span>: <span class="str">"yes"</span></pre>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">12 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 13 — DEVICES ET PREPARATION RINGS ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">3. Swift via Kolla</span>
+  <h1>Préparer les rings avant le déploiement</h1>
+  <p class="subtitle">Kolla génère les rings depuis un fichier de description des devices</p>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>📁 Structure attendue</h3>
+      <pre class="code small"><span class="cm"># /etc/kolla/config/swift/</span>
+swift/
+├── account.builder
+├── container.builder
+├── object.builder
+│
+├── account.ring.gz
+├── container.ring.gz
+├── object.ring.gz
+│
+└── swift.conf            <span class="cm"># overrides middleware</span></pre>
+      <p style="font-size: 12px;">Soit on fournit des builders pré-générés, soit on les construit avec un conteneur Kolla utilitaire.</p>
+      <h3 style="margin-top: 12px;">⚙️ Paramètres du ring</h3>
+      <ul>
+        <li><code>part_power</code> : 2^N partitions (typiquement 18 = 262 144)</li>
+        <li><code>replicas</code> : 3 par défaut</li>
+        <li><code>min_part_hours</code> : 1h avant qu'une partition puisse à nouveau bouger</li>
+      </ul>
+    </div>
+    <div>
+      <h3>🛠️ Génération avec swift-ring-builder</h3>
+      <pre class="code small"><span class="cm"># Conteneur utilitaire fourni par Kolla</span>
+<span class="kw">docker</span> run --rm -it \
+  -v /etc/kolla/config/swift:/etc/kolla/config/swift \
+  kolla/swift-base:<span class="str">$openstack_release</span> bash
+<span class="cm"># Dans le conteneur :</span>
+<span class="kw">cd</span> /etc/kolla/config/swift
+
+<span class="cm"># 1. Créer les builders (part_power 10 = lab)</span>
+<span class="kw">swift-ring-builder</span> account.builder   create <span class="num">10</span> <span class="num">3</span> <span class="num">1</span>
+<span class="kw">swift-ring-builder</span> container.builder create <span class="num">10</span> <span class="num">3</span> <span class="num">1</span>
+<span class="kw">swift-ring-builder</span> object.builder    create <span class="num">10</span> <span class="num">3</span> <span class="num">1</span>
+
+<span class="cm"># 2. Ajouter chaque device au ring</span>
+<span class="kw">swift-ring-builder</span> account.builder add \
+  --region <span class="num">1</span> --zone <span class="num">1</span> --ip <span class="num">10.10.0.31</span> \
+  --port <span class="num">6202</span> --device d1 --weight <span class="num">100</span>
+<span class="cm"># Idem pour container (port 6201) et object (6200)</span>
+
+<span class="cm"># 3. Rebalance et générer les .ring.gz</span>
+<span class="kw">swift-ring-builder</span> account.builder rebalance
+<span class="kw">swift-ring-builder</span> container.builder rebalance
+<span class="kw">swift-ring-builder</span> object.builder rebalance</pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">13 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 14 — DEPLOIEMENT SWIFT ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">3. Swift via Kolla</span>
+  <h1>Déploiement et vérifications</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🚀 Workflow</h3>
+      <pre class="code small"><span class="cm"># 1. Pré-checks ciblés Swift</span>
+<span class="kw">kolla-ansible</span> prechecks -i multinode \
+  --tags swift
+
+<span class="cm"># 2. Pull images Swift</span>
+<span class="kw">kolla-ansible</span> pull -i multinode \
+  --tags swift
+
+<span class="cm"># 3. Déploiement</span>
+<span class="kw">kolla-ansible</span> deploy -i multinode \
+  --tags swift
+
+<span class="cm"># 4. Reconfigurer après changement</span>
+<span class="kw">kolla-ansible</span> reconfigure -i multinode \
+  --tags swift
+
+<span class="cm"># 5. Limiter à un type de service</span>
+<span class="kw">kolla-ansible</span> reconfigure -i multinode \
+  --tags swift-proxy</pre>
+    </div>
+    <div>
+      <h3>✅ Vérifications</h3>
+      <pre class="code small"><span class="cm"># Conteneurs Swift en cours</span>
+<span class="kw">docker</span> ps --filter <span class="str">"name=swift"</span> \
+  --format <span class="str">"table {{.Names}}\t{{.Status}}"</span>
+
+<span class="cm"># Endpoint dans le catalogue</span>
+<span class="kw">openstack</span> endpoint list \
+  --service object-store
+
+<span class="cm"># Test connectivité</span>
+<span class="kw">openstack</span> object store account show
+
+<span class="cm"># Stats du cluster</span>
+<span class="kw">swift</span> stat -v
+
+<span class="cm"># État interne (recon)</span>
+<span class="kw">docker</span> exec swift_object_server \
+  swift-recon --md5 --all
+<span class="kw">docker</span> exec swift_object_server \
+  swift-recon --diskusage</pre>
+    </div>
+  </div>
+  <div class="info-box navy">
+    <p><span class="accent">💡 Logs</span> : <code>/var/log/kolla/swift/</code> sur le control (proxy) et sur les storage (account/container/object + replicator/auditor/updater).</p>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">14 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 15 — STORAGE POLICIES ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">3. Swift via Kolla</span>
+  <h1>Pools de stockage : storage policies</h1>
+  <p class="subtitle">Mélanger réplication classique et erasure coding dans le même cluster</p>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🎯 Principe</h3>
+      <ul>
+        <li>Une <strong>storage policy</strong> = un ring object + ses paramètres (replication ou erasure coding)</li>
+        <li>Un container choisit sa policy à la création — <strong>immuable</strong> ensuite</li>
+        <li>Permet de faire cohabiter dans le même cluster : SSD vs HDD, réplication 3× vs EC 8+4, zones géographiques différentes</li>
+        <li>Optimise les coûts selon la valeur de la donnée</li>
+      </ul>
+      <h3 style="margin-top: 12px;">📝 swift.conf — extrait override</h3>
+      <pre class="code small"><span class="cm"># /etc/kolla/config/swift/swift.conf</span>
+[<span class="var">storage-policy:0</span>]
+name = default-3replicas
+default = <span class="kw">yes</span>
+policy_type = replication
+
+[<span class="var">storage-policy:1</span>]
+name = ssd-fast
+policy_type = replication
+deprecated = <span class="kw">false</span>
+
+[<span class="var">storage-policy:2</span>]
+name = archive-ec
+policy_type = erasure_coding
+ec_type = liberasurecode_rs_vand
+ec_num_data_fragments = <span class="num">8</span>
+ec_num_parity_fragments = <span class="num">4</span>
+ec_object_segment_size = <span class="num">1048576</span></pre>
+    </div>
+    <div>
+      <h3>💻 Création de containers par policy</h3>
+      <pre class="code small"><span class="cm"># Créer un container avec policy SSD</span>
+<span class="kw">swift</span> post hot-data \
+  --header <span class="str">"X-Storage-Policy: ssd-fast"</span>
+
+<span class="cm"># Vérifier la policy</span>
+<span class="kw">swift</span> stat hot-data
+<span class="cm">Account: AUTH_xxx
+Container: hot-data
+X-Storage-Policy: ssd-fast</span>
+
+<span class="cm"># Container EC pour archives froides</span>
+<span class="kw">swift</span> post archives \
+  --header <span class="str">"X-Storage-Policy: archive-ec"</span>
+
+<span class="cm"># Migration entre policies =
+# copier l'objet dans un nouveau container
+# puis supprimer l'ancien
+# (la policy est immuable)</span>
+<span class="kw">swift</span> copy --destination /archives/db.tgz \
+  hot-data db.tgz
+<span class="kw">swift</span> delete hot-data db.tgz</pre>
+      <div class="info-box warning">
+        <p>Chaque policy a son <strong>propre ring</strong> object — il faut en créer un par policy déclarée.</p>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">15 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 16 — OPERATIONS CLIENT SWIFT ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">3. Swift via Kolla</span>
+  <h1>Opérations courantes côté client</h1>
+  <pre class="code small" style="flex: 1; overflow: auto;"><span class="cm">################################################################
+# Via openstackclient (couvre tout l'OpenStack)
+################################################################</span>
+<span class="kw">openstack</span> container create backups
+<span class="kw">openstack</span> container list
+<span class="kw">openstack</span> object create backups db-2024-12.tar.gz
+<span class="kw">openstack</span> object list backups
+<span class="kw">openstack</span> object save backups db-2024-12.tar.gz
+<span class="kw">openstack</span> object delete backups db-2024-12.tar.gz
+
+<span class="cm">################################################################
+# Via swift CLI (plus complet pour Swift)
+################################################################</span>
+<span class="kw">swift</span> upload backups /var/backups/*.tar.gz \
+  --object-name-prefix=<span class="str">"$(hostname)/"</span> \
+  --segment-size=<span class="num">1073741824</span>        <span class="cm"># Large Object (SLO) : 1 GB segments</span>
+
+<span class="kw">swift</span> list backups
+<span class="kw">swift</span> download backups db-2024-12.tar.gz
+<span class="kw">swift</span> delete backups db-2024-12.tar.gz
+
+<span class="cm"># Versioning par container</span>
+<span class="kw">swift</span> post production \
+  --header <span class="str">"X-Versions-Location: production-archive"</span>
+
+<span class="cm"># Expiration automatique d'un objet</span>
+<span class="kw">swift</span> upload logs access.log \
+  --header <span class="str">"X-Delete-After: 2592000"</span>     <span class="cm"># 30 jours</span>
+
+<span class="cm">################################################################
+# Via API S3 (boto3, awscli)
+################################################################</span>
+<span class="cm"># 1. Créer un EC2 credential pour l'utilisateur</span>
+<span class="kw">openstack</span> ec2 credentials create
+<span class="cm"># Récupère : Access (ID) + Secret</span>
+
+<span class="cm"># 2. Configurer awscli</span>
+<span class="kw">aws</span> configure --profile swift
+<span class="cm"># Region: (vide)</span>
+<span class="cm"># Endpoint: https://swift.example.com</span>
+
+<span class="kw">aws</span> --profile swift --endpoint-url https://swift.example.com \
+  s3 ls
+<span class="kw">aws</span> --profile swift --endpoint-url https://swift.example.com \
+  s3 cp ./report.pdf s3://backups/2024/</pre>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">16 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 17 — MIDDLEWARES & QUOTAS ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">3. Swift via Kolla</span>
+  <h1>Middlewares utiles et quotas</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🔌 Middlewares du pipeline proxy</h3>
+      <table>
+        <thead><tr><th>Middleware</th><th>Effet</th></tr></thead>
+        <tbody>
+          <tr><td><code>keystoneauth</code></td><td>Validation token Keystone</td></tr>
+          <tr><td><code>tempauth</code></td><td>Auth interne (lab)</td></tr>
+          <tr><td><code>account_quotas</code></td><td>Quotas par compte</td></tr>
+          <tr><td><code>container_quotas</code></td><td>Quotas par container</td></tr>
+          <tr><td><code>ratelimit</code></td><td>Limite req/sec</td></tr>
+          <tr><td><code>tempurl</code></td><td>Liens signés temporaires</td></tr>
+          <tr><td><code>formpost</code></td><td>Upload via formulaire HTML</td></tr>
+          <tr><td><code>versioned_writes</code></td><td>Versioning d'objets</td></tr>
+          <tr><td><code>slo</code></td><td>Static Large Object</td></tr>
+          <tr><td><code>dlo</code></td><td>Dynamic Large Object</td></tr>
+          <tr><td><code>s3api</code></td><td>Compatibilité S3</td></tr>
+          <tr><td><code>bulk</code></td><td>Suppression en masse</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <h3>📊 Gestion des quotas</h3>
+      <pre class="code small"><span class="cm"># Quota d'octets par account</span>
+<span class="kw">swift</span> post \
+  --meta <span class="str">"Quota-Bytes: 107374182400"</span>
+<span class="cm"># 100 GB</span>
+
+<span class="cm"># Quota par container</span>
+<span class="kw">swift</span> post backups \
+  --header <span class="str">"X-Container-Meta-Quota-Bytes: 50000000000"</span>
+<span class="kw">swift</span> post backups \
+  --header <span class="str">"X-Container-Meta-Quota-Count: 10000"</span>
+
+<span class="cm"># Vérifier</span>
+<span class="kw">swift</span> stat backups
+<span class="cm"># Meta Quota-Bytes: 50000000000</span></pre>
+      <h3 style="margin-top: 12px;">🔗 TempURL — liens signés</h3>
+      <pre class="code small"><span class="cm"># Définir une clé secrète sur l'account</span>
+<span class="kw">swift</span> post \
+  -m <span class="str">"Temp-URL-Key:my-secret-key"</span>
+
+<span class="cm"># Générer un lien valable 1h</span>
+<span class="kw">swift</span> tempurl GET <span class="num">3600</span> \
+  /v1/AUTH_xxx/backups/db.tar.gz \
+  my-secret-key</pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">17 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 18 — POOLS = ZONES & REGIONS ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">3. Swift via Kolla</span>
+  <h1>Gestion des pools : zones et regions</h1>
+  <div class="grid-2-1" style="margin-top: 8px;">
+    <div>
+      <div class="diagram-container" style="padding: 0;">
+        <svg viewBox="0 0 760 320" class="diagram">
+          <!-- Region 1 -->
+          <rect x="20" y="20" width="370" height="280" rx="10" fill="#F5F7FA" stroke="#0057B8" stroke-width="2" stroke-dasharray="6,3"/>
+          <text x="205" y="42" text-anchor="middle" fill="#0E1C33" font-size="13" font-weight="700">Region 1 — Paris</text>
+
+          <rect x="40" y="60" width="160" height="100" rx="8" fill="#0057B8"/>
+          <text x="120" y="82" text-anchor="middle" fill="white" font-size="12" font-weight="700">Zone 1 — Salle A</text>
+          <rect x="55" y="95" width="55" height="50" rx="3" fill="#00AEEF"/><text x="82" y="118" text-anchor="middle" fill="white" font-size="10">storage-01</text><text x="82" y="135" text-anchor="middle" fill="white" font-size="9">d1, d2</text>
+          <rect x="125" y="95" width="55" height="50" rx="3" fill="#00AEEF"/><text x="152" y="118" text-anchor="middle" fill="white" font-size="10">storage-02</text><text x="152" y="135" text-anchor="middle" fill="white" font-size="9">d1, d2</text>
+
+          <rect x="210" y="60" width="160" height="100" rx="8" fill="#0057B8"/>
+          <text x="290" y="82" text-anchor="middle" fill="white" font-size="12" font-weight="700">Zone 2 — Salle B</text>
+          <rect x="225" y="95" width="55" height="50" rx="3" fill="#00AEEF"/><text x="252" y="118" text-anchor="middle" fill="white" font-size="10">storage-03</text><text x="252" y="135" text-anchor="middle" fill="white" font-size="9">d1, d2</text>
+          <rect x="295" y="95" width="55" height="50" rx="3" fill="#00AEEF"/><text x="322" y="118" text-anchor="middle" fill="white" font-size="10">storage-04</text><text x="322" y="135" text-anchor="middle" fill="white" font-size="9">d1, d2</text>
+
+          <rect x="40" y="180" width="330" height="100" rx="8" fill="#0057B8"/>
+          <text x="205" y="202" text-anchor="middle" fill="white" font-size="12" font-weight="700">Zone 3 — Salle C</text>
+          <rect x="55" y="215" width="55" height="50" rx="3" fill="#00AEEF"/><text x="82" y="240" text-anchor="middle" fill="white" font-size="10">storage-05</text>
+          <rect x="125" y="215" width="55" height="50" rx="3" fill="#00AEEF"/><text x="152" y="240" text-anchor="middle" fill="white" font-size="10">storage-06</text>
+          <rect x="195" y="215" width="55" height="50" rx="3" fill="#00AEEF"/><text x="222" y="240" text-anchor="middle" fill="white" font-size="10">storage-07</text>
+          <rect x="265" y="215" width="55" height="50" rx="3" fill="#00AEEF"/><text x="292" y="240" text-anchor="middle" fill="white" font-size="10">storage-08</text>
+
+          <!-- Region 2 -->
+          <rect x="410" y="20" width="330" height="280" rx="10" fill="#F5F7FA" stroke="#8B5CF6" stroke-width="2" stroke-dasharray="6,3"/>
+          <text x="575" y="42" text-anchor="middle" fill="#0E1C33" font-size="13" font-weight="700">Region 2 — Lille (DR)</text>
+
+          <rect x="430" y="60" width="290" height="220" rx="8" fill="#8B5CF6"/>
+          <text x="575" y="82" text-anchor="middle" fill="white" font-size="12" font-weight="700">Zone 1 — Salle A</text>
+          <rect x="445" y="95" width="60" height="50" rx="3" fill="#A78BFA"/><text x="475" y="118" text-anchor="middle" fill="white" font-size="10">storage-09</text>
+          <rect x="520" y="95" width="60" height="50" rx="3" fill="#A78BFA"/><text x="550" y="118" text-anchor="middle" fill="white" font-size="10">storage-10</text>
+          <rect x="595" y="95" width="60" height="50" rx="3" fill="#A78BFA"/><text x="625" y="118" text-anchor="middle" fill="white" font-size="10">storage-11</text>
+
+          <rect x="445" y="160" width="60" height="50" rx="3" fill="#A78BFA"/><text x="475" y="183" text-anchor="middle" fill="white" font-size="10">storage-12</text>
+          <rect x="520" y="160" width="60" height="50" rx="3" fill="#A78BFA"/><text x="550" y="183" text-anchor="middle" fill="white" font-size="10">storage-13</text>
+          <rect x="595" y="160" width="60" height="50" rx="3" fill="#A78BFA"/><text x="625" y="183" text-anchor="middle" fill="white" font-size="10">storage-14</text>
+
+          <text x="575" y="245" text-anchor="middle" fill="rgba(255,255,255,0.95)" font-size="10">Réplication asynchrone</text>
+          <text x="575" y="262" text-anchor="middle" fill="rgba(255,255,255,0.95)" font-size="10">depuis Region 1</text>
+        </svg>
+      </div>
+    </div>
+    <div>
+      <h3>🌐 Stratégie</h3>
+      <ul>
+        <li><strong>Zone</strong> = unité de panne (rack, salle)</li>
+        <li>Le ring garantit qu'aucune zone n'a deux répliques d'une même partition</li>
+        <li><strong>Region</strong> = datacenter complet, réplication asynchrone</li>
+        <li>Permet du <strong>Disaster Recovery</strong> géographique</li>
+      </ul>
+      <h3 style="margin-top: 10px;">⚖️ Weights</h3>
+      <ul>
+        <li>Plus le <code>weight</code> est grand, plus le device reçoit de partitions</li>
+        <li>Usage : équilibrer disques hétérogènes (4 TB → weight 100, 8 TB → weight 200)</li>
+        <li>Drainer un disque : weight = 0 + rebalance + remove</li>
+      </ul>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">18 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 19 — MAINTENANCE SWIFT ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">3. Swift via Kolla</span>
+  <h1>Opérations de maintenance Swift</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>➕ Ajouter un disque à un node</h3>
+      <pre class="code small"><span class="cm"># 1. Préparer le disque côté node</span>
+<span class="kw">mkfs.xfs</span> -L swift_d3 /dev/sdd
+<span class="kw">mkdir</span> /srv/node/d3
+<span class="cm"># Ajouter dans /etc/fstab + mount -a</span>
+
+<span class="cm"># 2. Côté builders, ajouter aux 3 rings</span>
+<span class="kw">swift-ring-builder</span> object.builder add \
+  --region <span class="num">1</span> --zone <span class="num">1</span> \
+  --ip <span class="num">10.10.0.31</span> --port <span class="num">6200</span> \
+  --device d3 --weight <span class="num">100</span>
+
+<span class="cm"># 3. Rebalance puis distribuer
+# les rings aux nodes (Kolla le fait)</span>
+<span class="kw">swift-ring-builder</span> object.builder rebalance
+
+<span class="kw">kolla-ansible</span> reconfigure -i multinode \
+  --tags swift</pre>
+    </div>
+    <div>
+      <h3>➖ Retirer un disque proprement</h3>
+      <pre class="code small"><span class="cm"># 1. Drain : weight 0, rebalance</span>
+<span class="kw">swift-ring-builder</span> object.builder set_weight \
+  <span class="num">10.10.0.31</span>/d3 <span class="num">0</span>
+<span class="kw">swift-ring-builder</span> object.builder rebalance
+
+<span class="kw">kolla-ansible</span> reconfigure -i multinode \
+  --tags swift
+
+<span class="cm"># 2. Attendre que les replicators
+# aient déplacé toutes les partitions
+# (peut prendre plusieurs heures)</span>
+<span class="kw">docker</span> exec swift_object_server \
+  swift-recon --md5 --all
+
+<span class="cm"># 3. Retirer définitivement</span>
+<span class="kw">swift-ring-builder</span> object.builder remove \
+  <span class="num">10.10.0.31</span>/d3
+<span class="kw">swift-ring-builder</span> object.builder rebalance</pre>
+    </div>
+  </div>
+  <div class="info-box warning">
+    <p>⚠️ <code>min_part_hours</code> empêche un nouveau rebalance avant N heures pour éviter les "thrashing" : on attend ou on force avec <code>set_min_part_hours 0</code> (à utiliser avec prudence).</p>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">19 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 20 — INTEGRATION GLANCE CINDER BACKUP ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">3. Swift via Kolla</span>
+  <h1>Swift comme backend d'autres services</h1>
+  <div class="grid-3" style="margin-top: 8px;">
+    <div class="card cyan">
+      <h3>🖼️ Glance</h3>
+      <p style="font-size: 12px;">Glance peut stocker les images directement dans Swift au lieu du filesystem local.</p>
+      <pre class="code small" style="margin-top: 8px;"><span class="cm"># globals.yml</span>
+<span class="kw">glance_backend_swift</span>: <span class="str">"yes"</span>
+<span class="kw">glance_backend_file</span>: <span class="str">"no"</span></pre>
+      <p style="font-size: 12px; margin-top: 8px;">Avantage : haute disponibilité native, scaling massif. Les controllers Glance redeviennent stateless.</p>
+    </div>
+    <div class="card orange">
+      <h3>💾 Cinder backup</h3>
+      <p style="font-size: 12px;">Les snapshots Cinder peuvent être <strong>backupés vers Swift</strong> pour DR.</p>
+      <pre class="code small" style="margin-top: 8px;"><span class="cm"># cinder.conf</span>
+[<span class="var">DEFAULT</span>]
+backup_driver = \
+ cinder.backup.drivers.swift</pre>
+      <p style="font-size: 12px; margin-top: 8px;">Backup incrémental compressé et déduplicable. Restauration vers un nouveau volume.</p>
+    </div>
+    <div class="card purple">
+      <h3>📊 Trove, Ironic, Heat</h3>
+      <ul style="font-size: 12px;">
+        <li><strong>Trove</strong> : backups de bases DBaaS</li>
+        <li><strong>Ironic</strong> : images deploy</li>
+        <li><strong>Heat</strong> : templates</li>
+        <li><strong>Apps custom</strong> via S3 API</li>
+      </ul>
+      <div class="info-box" style="margin-top: 8px;">
+        <p style="font-size: 11px;">Tout service qui parle S3 peut viser Swift.</p>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">20 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 21 — DIVIDER CINDER ============================ -->
+<div class="slide divider">
+  <div class="brand-bar"></div>
+  <div class="decorative-circle" style="width: 500px; height: 500px; top: -150px; right: -150px;"></div>
+  <span class="module-tag">Chapitre 4</span>
+  <h1>Cinder<br/>Block storage</h1>
+  <p class="subtitle" style="margin-top: 20px;">Volumes persistants attachables aux instances Nova</p>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">21 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 22 — CINDER C'EST QUOI ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">4. Cinder : architecture</span>
+  <h1>Cinder en quelques mots</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🎯 Responsabilités</h3>
+      <ul>
+        <li>Provisionner des <strong>volumes block</strong> à la demande (de quelques Go à plusieurs To)</li>
+        <li>Les <strong>attacher</strong> à des instances Nova comme des disques durs locaux</li>
+        <li>Gérer les <strong>snapshots</strong>, <strong>backups</strong>, <strong>clones</strong></li>
+        <li>Abstraire des <strong>backends hétérogènes</strong> : LVM, Ceph, NetApp, EMC, Pure, IBM, NFS… via des drivers</li>
+        <li>Permettre le <strong>boot-from-volume</strong> (instance dont le root est persistant)</li>
+        <li>Exposer le stockage à <strong>Kubernetes</strong> (driver CSI Cinder)</li>
+      </ul>
+    </div>
+    <div>
+      <h3>🧠 Principes</h3>
+      <ul>
+        <li>Architecture <strong>stateless + scheduler</strong> similaire à Nova</li>
+        <li><strong>cinder-volume</strong> = agent par backend, parle au stockage physique</li>
+        <li>API REST, intégration Keystone, événements Oslo Messaging (RabbitMQ)</li>
+        <li>Persistance dans une <strong>base SQL</strong> (MariaDB/Galera)</li>
+        <li><strong>Multi-backend</strong> natif : un seul Cinder pilote plusieurs technologies en parallèle</li>
+      </ul>
+      <div class="info-box navy">
+        <p>💡 Cinder ne stocke <strong>jamais</strong> les données lui-même. Il pilote le backend, transmet aux VM via iSCSI/NBD/RBD/FC selon la techno.</p>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">22 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 23 — ARCHITECTURE CINDER ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">4. Cinder : architecture</span>
+  <h1>Architecture interne de Cinder</h1>
+  <div class="diagram-container">
+    <svg viewBox="0 0 1200 440" class="diagram">
+      <!-- Top -->
+      <rect x="30" y="20" width="1140" height="48" rx="8" fill="#0E1C33"/>
+      <text x="600" y="48" text-anchor="middle" fill="white" font-size="13" font-weight="700">Clients : openstack volume * • Nova (attach) • Horizon • Heat • CSI Kubernetes</text>
+
+      <!-- API -->
+      <rect x="350" y="85" width="500" height="55" rx="8" fill="#0057B8"/>
+      <text x="600" y="108" text-anchor="middle" fill="white" font-size="13" font-weight="700">cinder-api</text>
+      <text x="600" y="128" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="10">REST API • Keystone auth • persistance des intentions en DB</text>
+
+      <!-- Bus -->
+      <rect x="30" y="160" width="1140" height="38" rx="6" fill="#00AEEF"/>
+      <text x="600" y="184" text-anchor="middle" fill="white" font-size="13" font-weight="700">📨 RabbitMQ — RPC entre services Cinder</text>
+
+      <!-- Core: scheduler -->
+      <rect x="30" y="220" width="350" height="90" rx="8" fill="#0E1C33"/>
+      <text x="205" y="245" text-anchor="middle" fill="white" font-size="13" font-weight="700">cinder-scheduler</text>
+      <text x="205" y="265" text-anchor="middle" fill="#00AEEF" font-size="11">FilterScheduler par défaut</text>
+      <text x="205" y="282" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="10">Choisit le bon pool/backend selon</text>
+      <text x="205" y="298" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="10">capacité, AZ, volume_type, QoS</text>
+
+      <!-- cinder-volume agents -->
+      <rect x="400" y="220" width="350" height="90" rx="8" fill="#0E1C33"/>
+      <text x="575" y="245" text-anchor="middle" fill="white" font-size="13" font-weight="700">cinder-volume (par backend)</text>
+      <text x="575" y="265" text-anchor="middle" fill="#00AEEF" font-size="11">cinder-volume@lvm</text>
+      <text x="575" y="282" text-anchor="middle" fill="#00AEEF" font-size="11">cinder-volume@ceph</text>
+      <text x="575" y="298" text-anchor="middle" fill="#00AEEF" font-size="11">cinder-volume@netapp</text>
+
+      <!-- cinder-backup -->
+      <rect x="770" y="220" width="400" height="90" rx="8" fill="#0E1C33"/>
+      <text x="970" y="245" text-anchor="middle" fill="white" font-size="13" font-weight="700">cinder-backup</text>
+      <text x="970" y="265" text-anchor="middle" fill="#00AEEF" font-size="11">Sauvegarde / restauration</text>
+      <text x="970" y="282" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="10">backends : Swift, NFS, Ceph, Google Cloud Storage</text>
+      <text x="970" y="298" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="10">backups incrémentaux compressés</text>
+
+      <!-- Storage / DB -->
+      <rect x="30" y="330" width="350" height="90" rx="8" fill="#F5F7FA" stroke="#0E1C33" stroke-width="2"/>
+      <text x="205" y="358" text-anchor="middle" fill="#0E1C33" font-size="13" font-weight="700">🗄️ MariaDB</text>
+      <text x="205" y="378" text-anchor="middle" fill="#6B7A8F" font-size="10">base cinder : volumes, snapshots,</text>
+      <text x="205" y="394" text-anchor="middle" fill="#6B7A8F" font-size="10">backups, hosts, services, quotas</text>
+
+      <rect x="400" y="330" width="350" height="90" rx="8" fill="#F5F7FA" stroke="#0E1C33" stroke-width="2"/>
+      <text x="575" y="358" text-anchor="middle" fill="#0E1C33" font-size="13" font-weight="700">⚙️ Stockage physique</text>
+      <text x="575" y="378" text-anchor="middle" fill="#6B7A8F" font-size="10">LVM, Ceph RBD, NetApp, EMC,</text>
+      <text x="575" y="394" text-anchor="middle" fill="#6B7A8F" font-size="10">Pure, IBM, Dell, NFS, iSCSI…</text>
+
+      <rect x="770" y="330" width="400" height="90" rx="8" fill="#F5F7FA" stroke="#0E1C33" stroke-width="2"/>
+      <text x="970" y="358" text-anchor="middle" fill="#0E1C33" font-size="13" font-weight="700">🔗 Services consommés</text>
+      <text x="970" y="378" text-anchor="middle" fill="#6B7A8F" font-size="10">Keystone (auth) • Nova (attach)</text>
+      <text x="970" y="394" text-anchor="middle" fill="#6B7A8F" font-size="10">Swift (backup) • Glance (volume from image)</text>
+
+      <line x1="600" y1="140" x2="600" y2="160" stroke="#6B7A8F" stroke-width="1.5"/>
+      <line x1="205" y1="198" x2="205" y2="220" stroke="#6B7A8F" stroke-width="1.5"/>
+      <line x1="575" y1="198" x2="575" y2="220" stroke="#6B7A8F" stroke-width="1.5"/>
+      <line x1="970" y1="198" x2="970" y2="220" stroke="#6B7A8F" stroke-width="1.5"/>
+    </svg>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">23 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 24 — CYCLE DE VIE VOLUME ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">4. Cinder : architecture</span>
+  <h1>Cycle de vie d'un volume Cinder</h1>
+  <div class="diagram-container">
+    <svg viewBox="0 0 1200 360" class="diagram">
+      <g font-size="11" font-weight="700">
+        <rect x="30" y="150" width="120" height="50" rx="25" fill="#F5F7FA" stroke="#0E1C33" stroke-width="2"/>
+        <text x="90" y="175" text-anchor="middle" fill="#0E1C33">creating</text>
+        <text x="90" y="190" text-anchor="middle" fill="#6B7A8F" font-size="9">scheduler→volume</text>
+
+        <rect x="190" y="150" width="120" height="50" rx="25" fill="#0057B8"/>
+        <text x="250" y="175" text-anchor="middle" fill="white">available</text>
+        <text x="250" y="190" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="9">prêt à attacher</text>
+
+        <rect x="350" y="40" width="120" height="50" rx="25" fill="#F59E0B"/>
+        <text x="410" y="65" text-anchor="middle" fill="white">attaching</text>
+        <text x="410" y="80" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="9">via iSCSI/RBD</text>
+
+        <rect x="510" y="40" width="120" height="50" rx="25" fill="#00AEEF"/>
+        <text x="570" y="65" text-anchor="middle" fill="white">in-use</text>
+        <text x="570" y="80" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="9">monté sur VM</text>
+
+        <rect x="350" y="150" width="120" height="50" rx="25" fill="#F5F7FA" stroke="#8B5CF6" stroke-width="2"/>
+        <text x="410" y="175" text-anchor="middle" fill="#0E1C33">extending</text>
+        <text x="410" y="190" text-anchor="middle" fill="#6B7A8F" font-size="9">redim. à chaud</text>
+
+        <rect x="510" y="150" width="120" height="50" rx="25" fill="#F5F7FA" stroke="#8B5CF6" stroke-width="2"/>
+        <text x="570" y="175" text-anchor="middle" fill="#0E1C33">retyping</text>
+        <text x="570" y="190" text-anchor="middle" fill="#6B7A8F" font-size="9">migration de pool</text>
+
+        <rect x="670" y="40" width="120" height="50" rx="25" fill="#10B981"/>
+        <text x="730" y="65" text-anchor="middle" fill="white">snapshot</text>
+
+        <rect x="670" y="150" width="120" height="50" rx="25" fill="#10B981"/>
+        <text x="730" y="175" text-anchor="middle" fill="white">backup</text>
+        <text x="730" y="190" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="9">vers Swift/NFS</text>
+
+        <rect x="830" y="150" width="120" height="50" rx="25" fill="#EF4444"/>
+        <text x="890" y="175" text-anchor="middle" fill="white">deleting</text>
+
+        <rect x="990" y="150" width="120" height="50" rx="25" fill="#0E1C33"/>
+        <text x="1050" y="175" text-anchor="middle" fill="white">deleted</text>
+
+        <rect x="510" y="260" width="120" height="50" rx="25" fill="#F5F7FA" stroke="#EF4444" stroke-width="2"/>
+        <text x="570" y="285" text-anchor="middle" fill="#EF4444">error</text>
+      </g>
+      <defs>
+        <marker id="a3" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <polygon points="0,0 7,4 0,8" fill="#0057B8"/>
+        </marker>
+      </defs>
+      <g stroke="#0057B8" stroke-width="1.5" fill="none">
+        <path d="M 150 175 L 190 175" marker-end="url(#a3)"/>
+        <path d="M 310 165 Q 350 100 350 70" marker-end="url(#a3)"/>
+        <path d="M 470 65 L 510 65" marker-end="url(#a3)"/>
+        <path d="M 510 80 Q 400 130 310 165" marker-end="url(#a3)" stroke-dasharray="4,3"/>
+        <text x="430" y="120" font-size="9" fill="#0057B8">detach</text>
+        <path d="M 310 175 L 350 175" marker-end="url(#a3)"/>
+        <path d="M 470 175 L 510 175" marker-end="url(#a3)"/>
+        <path d="M 570 65 L 670 65" marker-end="url(#a3)"/>
+        <path d="M 310 195 Q 670 220 730 200" marker-end="url(#a3)" stroke-dasharray="4,3"/>
+        <text x="430" y="225" font-size="9" fill="#0057B8">create-backup</text>
+        <path d="M 310 200 Q 580 240 830 175" marker-end="url(#a3)"/>
+        <text x="600" y="245" font-size="9" fill="#0057B8">delete</text>
+        <path d="M 950 175 L 990 175" marker-end="url(#a3)"/>
+        <path d="M 310 175 Q 400 230 510 280" marker-end="url(#a3)" stroke="#EF4444"/>
+      </g>
+    </svg>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">24 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 25 — KOLLA CINDER STRUCTURE ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">4. Cinder : architecture</span>
+  <h1>Cinder dans Kolla : structure</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>📋 Groupes Kolla pour Cinder</h3>
+      <pre class="code small"><span class="cm"># multinode</span>
+[cinder-api:children]
+control
+
+[cinder-scheduler:children]
+control
+
+[cinder-volume:children]
+storage
+
+[cinder-backup:children]
+storage</pre>
+      <h3 style="margin-top: 12px;">🐳 Conteneurs déployés</h3>
+      <ul>
+        <li><strong>control</strong> : <code>cinder_api</code>, <code>cinder_scheduler</code></li>
+        <li><strong>storage</strong> : <code>cinder_volume</code> (par backend), <code>cinder_backup</code></li>
+        <li>Pour LVM : nécessite que le volume group existe déjà sur l'hôte storage</li>
+        <li>Pour Ceph : montage <code>/etc/ceph/</code> dans le conteneur</li>
+      </ul>
+    </div>
+    <div>
+      <h3>📁 Overrides /etc/kolla/config/cinder/</h3>
+      <pre class="code small">cinder/
+├── cinder.conf                <span class="cm"># Tous les services</span>
+├── cinder-api.conf            <span class="cm"># API uniquement</span>
+├── cinder-volume.conf         <span class="cm"># Agents volume</span>
+├── cinder-backup.conf         <span class="cm"># Service backup</span>
+│
+├── nfs_shares                 <span class="cm"># si backend NFS</span>
+│
+└── ceph/
+    ├── ceph.conf
+    ├── ceph.client.cinder.keyring
+    └── ceph.client.cinder-backup.keyring</pre>
+      <div class="info-box">
+        <p>Chaque fichier override est <strong>fusionné</strong> dans la config générée par Kolla : on n'écrase pas, on complète.</p>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">25 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 26 — GLOBALS YML CINDER ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">4. Cinder : architecture</span>
+  <h1>globals.yml — variables Cinder</h1>
+  <pre class="code small" style="flex: 1; overflow: auto;"><span class="cm">################################################################
+# /etc/kolla/globals.yml — extraits Cinder
+################################################################</span>
+
+<span class="cm"># Activation</span>
+<span class="kw">enable_cinder</span>: <span class="str">"yes"</span>
+<span class="kw">enable_cinder_backup</span>: <span class="str">"yes"</span>
+<span class="kw">enable_cinder_backend_lvm</span>: <span class="str">"yes"</span>           <span class="cm"># LVM local</span>
+<span class="kw">enable_cinder_backend_nfs</span>: <span class="str">"no"</span>
+<span class="kw">enable_cinder_backend_iscsi</span>: <span class="str">"no"</span>
+<span class="kw">enable_cinder_backend_quobyte</span>: <span class="str">"no"</span>
+
+<span class="cm"># Si Ceph est utilisé</span>
+<span class="kw">cinder_backend_ceph</span>: <span class="str">"yes"</span>
+<span class="kw">cinder_backup_driver</span>: <span class="str">"ceph"</span>               <span class="cm"># ou "swift"</span>
+
+<span class="cm"># Backend LVM : nom du volume group</span>
+<span class="kw">cinder_volume_group</span>: <span class="str">"cinder-volumes"</span>
+
+<span class="cm"># NFS shares (fichier /etc/kolla/config/cinder/nfs_shares)</span>
+<span class="cm"># cinder_nfs_shares mappé dans le fichier</span>
+
+<span class="cm"># Configuration multi-backend</span>
+<span class="kw">cinder_backends</span>:
+  - <span class="kw">name</span>: <span class="str">"lvm-1"</span>
+    <span class="kw">enabled</span>: <span class="str">"yes"</span>
+    <span class="kw">type</span>: <span class="str">"lvm"</span>
+  - <span class="kw">name</span>: <span class="str">"ceph-1"</span>
+    <span class="kw">enabled</span>: <span class="str">"yes"</span>
+    <span class="kw">type</span>: <span class="str">"ceph"</span>
+
+<span class="cm"># API et endpoints</span>
+<span class="kw">cinder_keystone_user</span>: <span class="str">"cinder"</span>
+<span class="kw">cinder_internal_endpoint</span>: <span class="str">"https://cinder.example.com:8776/v3/%(tenant_id)s"</span>
+
+<span class="cm"># Réplications, replication-enabled
+# Selon les backends et la criticité</span></pre>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">26 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 27 — DIVIDER BACKENDS ============================ -->
+<div class="slide divider">
+  <div class="brand-bar"></div>
+  <div class="decorative-circle" style="width: 500px; height: 500px; bottom: -150px; left: -150px;"></div>
+  <span class="module-tag">Chapitre 5</span>
+  <h1>Backends<br/>de Cinder</h1>
+  <p class="subtitle" style="margin-top: 20px;">LVM, Ceph, NFS, baies SAN — choisir et configurer</p>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">27 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 28 — BACKENDS PANORAMA ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">5. Backends Cinder</span>
+  <h1>Panorama des backends</h1>
+  <div style="flex: 1; overflow: auto; margin-top: 8px;">
+    <table>
+      <thead>
+        <tr><th>Backend</th><th>Type</th><th>Cas d'usage</th><th>Protocole d'attach</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>LVM (local)</strong></td><td><span class="pill cyan">Open source</span></td><td>Lab, petits clouds mono-node</td><td>iSCSI (tgtadm/lioadm)</td><td>Inclus, pas de HA native</td></tr>
+        <tr><td><strong>Ceph RBD</strong></td><td><span class="pill green">★ Open source</span></td><td>Production, scale-out, HA</td><td>RBD (librbd)</td><td>Référence — copy-on-write, snapshots instantanés</td></tr>
+        <tr><td><strong>NFS</strong></td><td><span class="pill cyan">Open source</span></td><td>Réutiliser un NAS existant</td><td>NFS (fichier sparse en disk image)</td><td>Performances moyennes, simple</td></tr>
+        <tr><td><strong>iSCSI générique</strong></td><td><span class="pill cyan">Open source</span></td><td>SAN simple, NAS iSCSI</td><td>iSCSI direct</td><td>Driver générique, peu de features</td></tr>
+        <tr><td><strong>NetApp ONTAP</strong></td><td><span class="pill purple">Vendor</span></td><td>Entreprise, dédup, replication</td><td>iSCSI / FC / NFS</td><td>Driver officiel, support certifié</td></tr>
+        <tr><td><strong>Pure Storage</strong></td><td><span class="pill purple">Vendor</span></td><td>All-flash, perf I/O extrêmes</td><td>iSCSI / FC / NVMe-oF</td><td>Snapshots et clones quasi gratuits</td></tr>
+        <tr><td><strong>Dell EMC PowerStore / Unity</strong></td><td><span class="pill purple">Vendor</span></td><td>Mid-range to enterprise</td><td>iSCSI / FC</td><td>QoS, tiering automatique</td></tr>
+        <tr><td><strong>IBM Storwize / FlashSystem</strong></td><td><span class="pill purple">Vendor</span></td><td>Charges mainframe & SAP</td><td>iSCSI / FC</td><td>Compression à la volée</td></tr>
+        <tr><td><strong>HPE 3PAR / Primera / Nimble</strong></td><td><span class="pill purple">Vendor</span></td><td>Enterprise, hybrid</td><td>iSCSI / FC</td><td>Analytics InfoSight</td></tr>
+        <tr><td><strong>VMware VMDK</strong></td><td><span class="pill orange">Hybride</span></td><td>Cloud OpenStack sur ESXi</td><td>VMDK (vCenter)</td><td>Couplé au driver Nova VMware</td></tr>
+        <tr><td><strong>Sheepdog, GlusterFS</strong></td><td><span class="pill red">Legacy</span></td><td>Rares en production</td><td>Spécifique</td><td>Drivers conservés pour compat</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">28 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 29 — LVM BACKEND ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">5. Backends Cinder</span>
+  <h1>Backend LVM : configuration détaillée</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🧱 Préparation hôte storage</h3>
+      <pre class="code small"><span class="cm"># Sur chaque storage-XX
+# Disques dédiés (jamais l'OS)</span>
+<span class="kw">lsblk</span>
+<span class="cm"># sdb 1T disk</span>
+
+<span class="cm"># 1. PV puis VG nommé "cinder-volumes"</span>
+<span class="kw">pvcreate</span> /dev/sdb
+<span class="kw">vgcreate</span> cinder-volumes /dev/sdb
+<span class="kw">vgs</span>
+
+<span class="cm"># 2. Installer tgt ou targetcli (Kolla déploie targetcli en conteneur)</span>
+
+<span class="cm"># 3. Filtrer LVM pour ignorer
+# les LV des VM (évite que les LV
+# Cinder soient vus comme PV)</span>
+<span class="kw">vim</span> /etc/lvm/lvm.conf
+<span class="cm">filter = [ "a|sdb|", "r|.*|" ]</span></pre>
+    </div>
+    <div>
+      <h3>⚙️ Override Kolla</h3>
+      <pre class="code small"><span class="cm"># globals.yml</span>
+<span class="kw">enable_cinder_backend_lvm</span>: <span class="str">"yes"</span>
+<span class="kw">cinder_volume_group</span>: <span class="str">"cinder-volumes"</span>
+
+<span class="cm"># /etc/kolla/config/cinder/cinder-volume.conf</span>
+[<span class="var">DEFAULT</span>]
+enabled_backends = lvm-1
+
+[<span class="var">lvm-1</span>]
+volume_driver = <span class="str">cinder.volume.drivers.lvm.LVMVolumeDriver</span>
+volume_backend_name = <span class="str">lvm-1</span>
+volume_group = <span class="str">cinder-volumes</span>
+target_protocol = <span class="str">iscsi</span>
+target_helper = <span class="str">lioadm</span>
+target_ip_address = <span class="str">10.10.0.31</span>
+lvm_type = <span class="str">thin</span>            <span class="cm"># thin pool</span>
+lvm_mirrors = <span class="num">0</span>
+report_discard_supported = <span class="kw">true</span></pre>
+    </div>
+  </div>
+  <div class="info-box warning">
+    <p>⚠️ LVM thin pools doivent être créés manuellement (<code>lvcreate --thinpool</code>) avant que Cinder y crée des thin volumes. Le pool plein bloque tous les volumes — surveiller <code>vgs</code> et <code>lvs</code>.</p>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">29 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 30 — CEPH RBD ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">5. Backends Cinder</span>
+  <h1>Backend Ceph RBD : le standard production</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🐙 Pourquoi Ceph ?</h3>
+      <ul>
+        <li>Stockage distribué <strong>scale-out</strong> open source</li>
+        <li>Pas de SPOF, réplication ou erasure coding configurable par pool</li>
+        <li>Snapshots et clones <strong>copy-on-write</strong> instantanés</li>
+        <li>Intégration native avec Glance (RBD), Cinder (RBD), Nova (libvirt RBD), Swift (RGW)</li>
+        <li>Une seule techno pour <strong>tout le stockage</strong> OpenStack</li>
+      </ul>
+      <h3 style="margin-top: 12px;">🪣 Pools Ceph à créer</h3>
+      <pre class="code small"><span class="kw">ceph</span> osd pool create volumes <span class="num">128</span>
+<span class="kw">ceph</span> osd pool create vms <span class="num">128</span>
+<span class="kw">ceph</span> osd pool create images <span class="num">64</span>
+<span class="kw">ceph</span> osd pool create backups <span class="num">64</span>
+
+<span class="cm"># Initialiser pour RBD</span>
+<span class="kw">rbd</span> pool init volumes
+<span class="kw">rbd</span> pool init vms
+<span class="kw">rbd</span> pool init images
+<span class="kw">rbd</span> pool init backups</pre>
+    </div>
+    <div>
+      <h3>🔐 Préparation Kolla</h3>
+      <pre class="code small"><span class="cm"># Côté Ceph : créer les clients</span>
+<span class="kw">ceph</span> auth get-or-create client.cinder \
+  mon <span class="str">'profile rbd'</span> \
+  osd <span class="str">'profile rbd pool=volumes,</span>\
+<span class="str">profile rbd pool=vms,</span>\
+<span class="str">profile rbd-read-only pool=images'</span>
+
+<span class="kw">ceph</span> auth get-or-create client.cinder-backup \
+  mon <span class="str">'profile rbd'</span> \
+  osd <span class="str">'profile rbd pool=backups'</span>
+
+<span class="cm"># Côté node de déploiement Kolla</span>
+<span class="kw">mkdir</span> -p /etc/kolla/config/cinder/ceph
+<span class="kw">cp</span> ceph.conf /etc/kolla/config/cinder/ceph/
+<span class="kw">cp</span> ceph.client.cinder.keyring \
+   /etc/kolla/config/cinder/ceph/
+<span class="kw">cp</span> ceph.client.cinder-backup.keyring \
+   /etc/kolla/config/cinder/ceph/
+
+<span class="cm"># Idem pour Nova et Glance dans
+# leurs répertoires respectifs</span>
+
+<span class="cm"># globals.yml</span>
+<span class="kw">cinder_backend_ceph</span>: <span class="str">"yes"</span>
+<span class="kw">cinder_backup_driver</span>: <span class="str">"ceph"</span>
+<span class="kw">glance_backend_ceph</span>: <span class="str">"yes"</span>
+<span class="kw">nova_backend_ceph</span>: <span class="str">"yes"</span></pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">30 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 31 — NFS BACKEND ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">5. Backends Cinder</span>
+  <h1>Backend NFS : intégrer un NAS existant</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🎯 Quand l'utiliser ?</h3>
+      <ul>
+        <li>Vous avez déjà un <strong>NAS</strong> en production (Synology, NetApp, TrueNAS) et vous voulez l'exploiter</li>
+        <li>Pas de besoin de très hautes IOPS</li>
+        <li>Backups Cinder vers NFS</li>
+        <li>Lab pédagogique simple</li>
+      </ul>
+      <h3 style="margin-top: 12px;">⚙️ Fonctionnement</h3>
+      <ul>
+        <li>Chaque volume est un <strong>fichier sparse</strong> (qcow2 ou raw) sur le partage NFS</li>
+        <li>Le compute monte ce fichier comme un disque virtio</li>
+        <li>Snapshots = qcow2 backing files</li>
+        <li>Pas de réplication native : on s'appuie sur le NAS</li>
+      </ul>
+    </div>
+    <div>
+      <h3>📝 Configuration Kolla</h3>
+      <pre class="code small"><span class="cm"># globals.yml</span>
+<span class="kw">enable_cinder_backend_nfs</span>: <span class="str">"yes"</span>
+
+<span class="cm"># /etc/kolla/config/cinder/nfs_shares
+# (un export par ligne)</span>
+nas-01.utopios.local:/cinder/vol1
+nas-01.utopios.local:/cinder/vol2
+
+<span class="cm"># /etc/kolla/config/cinder/cinder-volume.conf</span>
+[<span class="var">DEFAULT</span>]
+enabled_backends = nfs-1
+
+[<span class="var">nfs-1</span>]
+volume_driver = <span class="str">cinder.volume.drivers.nfs.NfsDriver</span>
+volume_backend_name = <span class="str">nfs-1</span>
+nfs_shares_config = <span class="str">/etc/cinder/nfs_shares</span>
+nfs_sparsed_volumes = <span class="kw">true</span>
+nfs_mount_options = <span class="str">vers=4.1,nconnect=8,actimeo=300</span>
+nfs_qcow2_volumes = <span class="kw">true</span>
+
+<span class="cm"># Démarrer et vérifier</span>
+<span class="kw">kolla-ansible</span> reconfigure -i multinode \
+  --tags cinder</pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">31 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 32 — VENDOR BACKENDS ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">5. Backends Cinder</span>
+  <h1>Drivers commerciaux : exemple NetApp ONTAP</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🎯 Approche générale</h3>
+      <ul>
+        <li>Chaque vendor fournit un driver Python intégré au repo upstream Cinder</li>
+        <li>Le driver parle au <strong>controller</strong> de la baie via son API (REST, SOAP, SSH)</li>
+        <li>Cinder délègue le provisioning au backend qui crée les LUNs et présente via iSCSI ou FC</li>
+        <li>Les fonctionnalités natives (dédup, compression, thin, snapshots, replication) sont exposées comme <strong>volume types</strong></li>
+      </ul>
+      <h3 style="margin-top: 12px;">📋 Sources d'information</h3>
+      <ul>
+        <li>Cinder Support Matrix : docs.openstack.org/cinder/.../drivers.html</li>
+        <li>Chaque vendor maintient une page "OpenStack" avec versions supportées</li>
+        <li>Tester en lab avant la prod : certaines features (replication) demandent une licence</li>
+      </ul>
+    </div>
+    <div>
+      <h3>⚙️ Exemple NetApp iSCSI</h3>
+      <pre class="code small"><span class="cm"># cinder-volume.conf</span>
+[<span class="var">DEFAULT</span>]
+enabled_backends = netapp-1, ceph-1
+
+[<span class="var">netapp-1</span>]
+volume_driver = <span class="str">cinder.volume.drivers.netapp.\
+common.NetAppDriver</span>
+volume_backend_name = <span class="str">netapp-1</span>
+
+netapp_storage_family = <span class="str">ontap_cluster</span>
+netapp_storage_protocol = <span class="str">iscsi</span>
+netapp_server_hostname = <span class="str">netapp-cluster.utopios.local</span>
+netapp_server_port = <span class="num">443</span>
+netapp_login = <span class="str">openstack-cinder</span>
+netapp_password = <span class="str">****</span>
+netapp_vserver = <span class="str">vserver-openstack</span>
+netapp_transport_type = <span class="str">https</span>
+
+<span class="cm"># Pools spécifiques</span>
+netapp_pool_name_search_pattern = <span class="str">"openstack_.*"</span>
+
+<span class="cm"># QoS</span>
+netapp_enable_qos = <span class="kw">true</span>
+use_multipath_for_image_xfer = <span class="kw">true</span></pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">32 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 33 — MULTI BACKEND ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">5. Backends Cinder</span>
+  <h1>Configuration multi-backend</h1>
+  <p class="subtitle">Faire cohabiter plusieurs technos sur un seul Cinder</p>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🎯 Pattern type</h3>
+      <ul>
+        <li>1 cinder-api + 1 cinder-scheduler centraux</li>
+        <li>N <strong>cinder-volume</strong>, un par backend, identifiés par leur <code>host@&lt;backend_name&gt;</code></li>
+        <li>Chacun a sa section <code>[backend_name]</code> dans <code>cinder.conf</code> avec son driver</li>
+        <li>Le scheduler choisit le backend selon le <strong>volume_type</strong> demandé</li>
+      </ul>
+      <h3 style="margin-top: 12px;">🎚️ Volume types</h3>
+      <pre class="code small"><span class="cm"># Créer un type qui cible Ceph</span>
+<span class="kw">openstack</span> volume type create ceph-ssd
+<span class="kw">openstack</span> volume type set ceph-ssd \
+  --property volume_backend_name=<span class="str">ceph-1</span>
+
+<span class="kw">openstack</span> volume type create lvm-cold
+<span class="kw">openstack</span> volume type set lvm-cold \
+  --property volume_backend_name=<span class="str">lvm-1</span>
+
+<span class="cm"># Créer un volume avec un type donné</span>
+<span class="kw">openstack</span> volume create web-data \
+  --size <span class="num">100</span> --type ceph-ssd</pre>
+    </div>
+    <div>
+      <h3>📝 cinder.conf multi-backend</h3>
+      <pre class="code small">[<span class="var">DEFAULT</span>]
+enabled_backends = lvm-1, ceph-1, netapp-1
+default_volume_type = ceph-ssd
+
+[<span class="var">lvm-1</span>]
+volume_driver = <span class="str">cinder.volume.drivers.lvm.\
+LVMVolumeDriver</span>
+volume_backend_name = <span class="str">lvm-1</span>
+volume_group = <span class="str">cinder-volumes</span>
+
+[<span class="var">ceph-1</span>]
+volume_driver = <span class="str">cinder.volume.drivers.rbd.\
+RBDDriver</span>
+volume_backend_name = <span class="str">ceph-1</span>
+rbd_pool = <span class="str">volumes</span>
+rbd_ceph_conf = <span class="str">/etc/ceph/ceph.conf</span>
+rbd_user = <span class="str">cinder</span>
+rbd_secret_uuid = <span class="str">a1b2c3...</span>
+
+[<span class="var">netapp-1</span>]
+volume_driver = <span class="str">cinder.volume.drivers.\
+netapp.common.NetAppDriver</span>
+volume_backend_name = <span class="str">netapp-1</span>
+<span class="cm"># ... voir slide précédente</span></pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">33 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 34 — DIVIDER VOLUME TYPES ============================ -->
+<div class="slide divider">
+  <div class="brand-bar"></div>
+  <div class="decorative-circle" style="width: 500px; height: 500px; top: -150px; left: -150px;"></div>
+  <span class="module-tag">Chapitre 6</span>
+  <h1>Volume types,<br/>QoS &amp; snapshots</h1>
+  <p class="subtitle" style="margin-top: 20px;">Façonner et exploiter le service Cinder au quotidien</p>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">34 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 35 — VOLUME TYPES EXTRA SPECS ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">6. Types, QoS, snapshots</span>
+  <h1>Volume types avancés et extra-specs</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🎚️ Extra-specs courantes</h3>
+      <table>
+        <thead><tr><th>Spec</th><th>Effet</th></tr></thead>
+        <tbody>
+          <tr><td><code>volume_backend_name</code></td><td>Cible un backend précis</td></tr>
+          <tr><td><code>capabilities:storage_protocol</code></td><td>iscsi, fc, rbd…</td></tr>
+          <tr><td><code>capabilities:vendor_name</code></td><td>NetApp, Pure, EMC…</td></tr>
+          <tr><td><code>RESKEY:availability_zones</code></td><td>Restreint aux AZ</td></tr>
+          <tr><td><code>replication_enabled</code></td><td>"&lt;is&gt; True"</td></tr>
+          <tr><td><code>multiattach</code></td><td>"&lt;is&gt; True"</td></tr>
+          <tr><td><code>thin_provisioning_support</code></td><td>"&lt;is&gt; True"</td></tr>
+          <tr><td><code>compression_support</code></td><td>"&lt;is&gt; True"</td></tr>
+          <tr><td><code>netapp_*</code></td><td>Spécifique NetApp</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <h3>💻 Exemples concrets</h3>
+      <pre class="code small"><span class="cm"># Type "premium" : Ceph SSD + replication</span>
+<span class="kw">openstack</span> volume type create premium
+<span class="kw">openstack</span> volume type set premium \
+  --property volume_backend_name=<span class="str">ceph-ssd</span> \
+  --property replication_enabled=<span class="str">'&lt;is&gt; True'</span> \
+  --property RESKEY:availability_zones=<span class="str">'az-1,az-2'</span>
+
+<span class="cm"># Type "shared" : multiattach pour cluster</span>
+<span class="kw">openstack</span> volume type create shared
+<span class="kw">openstack</span> volume type set shared \
+  --property multiattach=<span class="str">'&lt;is&gt; True'</span> \
+  --property volume_backend_name=<span class="str">ceph-1</span>
+
+<span class="cm"># Type privé pour un projet uniquement</span>
+<span class="kw">openstack</span> volume type create finance-only \
+  --private
+<span class="kw">openstack</span> volume type set finance-only \
+  --project finance</pre>
+      <div class="info-box">
+        <p>L'utilisateur final ne voit que les types <strong>publics</strong> ou <strong>privés</strong> partagés avec son projet. Les extra-specs sont visibles uniquement aux admins.</p>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">35 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 36 — QOS ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">6. Types, QoS, snapshots</span>
+  <h1>Qualité de service (QoS) sur les volumes</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🎯 Deux niveaux d'application</h3>
+      <ul>
+        <li><strong>front-end</strong> : limite côté hyperviseur (libvirt/QEMU iotune). Universel, fonctionne avec n'importe quel backend</li>
+        <li><strong>back-end</strong> : limite côté baie de stockage. Nécessite un driver qui le supporte (NetApp, Pure, Ceph QoS)</li>
+        <li><strong>both</strong> : applique les deux</li>
+      </ul>
+      <h3 style="margin-top: 12px;">📐 Specs disponibles</h3>
+      <ul>
+        <li><code>total_iops_sec</code></li>
+        <li><code>read_iops_sec</code> / <code>write_iops_sec</code></li>
+        <li><code>total_bytes_sec</code></li>
+        <li><code>read_bytes_sec</code> / <code>write_bytes_sec</code></li>
+        <li><code>*_max</code> : burst toléré</li>
+        <li><code>*_burst</code> : durée du burst</li>
+      </ul>
+    </div>
+    <div>
+      <h3>💻 Création et association</h3>
+      <pre class="code small"><span class="cm"># 1. Créer une QoS spec</span>
+<span class="kw">openstack</span> volume qos create gold \
+  --consumer front-end \
+  --property total_iops_sec=<span class="num">10000</span> \
+  --property total_bytes_sec=<span class="num">524288000</span>
+
+<span class="kw">openstack</span> volume qos create bronze \
+  --consumer front-end \
+  --property total_iops_sec=<span class="num">500</span> \
+  --property total_bytes_sec=<span class="num">52428800</span>
+
+<span class="cm"># 2. Associer à un volume type</span>
+<span class="kw">openstack</span> volume qos associate \
+  gold premium
+
+<span class="kw">openstack</span> volume qos associate \
+  bronze lvm-cold
+
+<span class="cm"># 3. Tout volume créé avec le type
+# "premium" héritera des limites "gold"</span>
+<span class="kw">openstack</span> volume create app-db \
+  --size <span class="num">100</span> --type premium
+
+<span class="cm"># Vérifier sur l'hyperviseur</span>
+<span class="kw">virsh</span> blkdeviotune &lt;instance&gt; vda</pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">36 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 37 — SNAPSHOTS BACKUPS ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">6. Types, QoS, snapshots</span>
+  <h1>Snapshots vs Backups</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div class="card cyan">
+      <h3>📸 Snapshot</h3>
+      <ul>
+        <li><strong>Point-in-time</strong> du volume au moment T</li>
+        <li>Stocké sur le <strong>même backend</strong> que le volume parent</li>
+        <li><strong>Copy-on-write</strong> sur Ceph/Pure/NetApp : quasi instantané et sans coût</li>
+        <li>Sur LVM : copie réelle, plus lente</li>
+        <li>Permet de <strong>cloner</strong> un volume</li>
+        <li>Si le backend tombe, snapshot perdu — <strong>pas un backup</strong></li>
+      </ul>
+      <pre class="code small" style="margin-top: 8px;"><span class="kw">openstack</span> volume snapshot create \
+  --volume app-db db-snap-pre-deploy
+
+<span class="kw">openstack</span> volume create \
+  --snapshot db-snap-pre-deploy \
+  --size <span class="num">100</span> app-db-clone</pre>
+    </div>
+    <div class="card orange">
+      <h3>💾 Backup</h3>
+      <ul>
+        <li>Copie <strong>vers un autre stockage</strong> (Swift, NFS, Ceph, GCS)</li>
+        <li>Indépendant du backend source : <strong>vrai DR</strong></li>
+        <li>Incrémental : seules les <strong>diff</strong> sont transférées</li>
+        <li>Compressé, optionnellement chiffré</li>
+        <li>Restauration vers un nouveau volume</li>
+        <li>Backup d'un volume <strong>en cours d'utilisation</strong> = <code>--force</code></li>
+      </ul>
+      <pre class="code small" style="margin-top: 8px;"><span class="kw">openstack</span> volume backup create \
+  --name app-db-2024-12 \
+  --incremental app-db
+
+<span class="kw">openstack</span> volume backup restore \
+  app-db-2024-12 app-db-restored
+
+<span class="kw">openstack</span> volume backup list</pre>
+    </div>
+  </div>
+  <div class="info-box navy" style="margin-top: 12px;">
+    <p><span class="accent">💡 Stratégie type :</span> snapshots fréquents pour rollbacks rapides (toutes les heures) + backups Swift quotidiens pour DR.</p>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">37 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 38 — ATTACH OPERATIONS ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">6. Types, QoS, snapshots</span>
+  <h1>Attachement, extension, retype</h1>
+  <pre class="code small" style="flex: 1; overflow: auto;"><span class="cm">################################################################
+# 1. Cycle complet : créer, attacher, formater, monter
+################################################################</span>
+<span class="kw">openstack</span> volume create data-vol --size <span class="num">100</span> --type ceph-ssd
+<span class="kw">openstack</span> server add volume web-01 data-vol
+
+<span class="cm"># Dans la VM</span>
+<span class="kw">ssh</span> ubuntu@web-01 <span class="str">"
+  lsblk
+  sudo mkfs.ext4 /dev/vdb
+  sudo mkdir /data
+  sudo mount /dev/vdb /data
+  echo '/dev/vdb /data ext4 defaults 0 2' | sudo tee -a /etc/fstab
+"</span>
+
+<span class="cm">################################################################
+# 2. Multi-attach : un volume sur plusieurs VM (cluster)
+################################################################</span>
+<span class="kw">openstack</span> volume create shared-vol --size <span class="num">50</span> \
+  --type shared --multiattach
+<span class="kw">openstack</span> server add volume cluster-node-1 shared-vol
+<span class="kw">openstack</span> server add volume cluster-node-2 shared-vol
+<span class="cm"># ⚠️ Nécessite un FS cluster-aware : OCFS2, GFS2 ou Ceph RBD locking</span>
+
+<span class="cm">################################################################
+# 3. Extension à chaud
+################################################################</span>
+<span class="kw">openstack</span> volume set --size <span class="num">200</span> data-vol
+<span class="cm"># Dans la VM :</span>
+<span class="kw">sudo</span> resize2fs /dev/vdb
+<span class="cm"># Pour XFS : sudo xfs_growfs /data</span>
+
+<span class="cm">################################################################
+# 4. Retype : migrer un volume d'un backend vers un autre
+################################################################</span>
+<span class="kw">openstack</span> volume set --type premium data-vol \
+  --retype-policy on-demand
+<span class="cm"># Cinder déplace les données entre backends en arrière-plan
+# (peut être instantané si même pool, long sinon)</span>
+
+<span class="cm">################################################################
+# 5. Détacher et supprimer
+################################################################</span>
+<span class="kw">openstack</span> server remove volume web-01 data-vol
+<span class="kw">openstack</span> volume delete data-vol</pre>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">38 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 39 — BOOT FROM VOLUME ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">6. Types, QoS, snapshots</span>
+  <h1>Boot-from-volume : VM avec disque persistant</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>🎯 Intérêt</h3>
+      <ul>
+        <li>Le <strong>disque système</strong> est un volume Cinder, pas un disque éphémère local</li>
+        <li>L'instance survit à la perte d'un compute (rebuild ailleurs)</li>
+        <li>Permet <strong>resize sans perte</strong> du root</li>
+        <li>Snapshots du disque système</li>
+        <li>Indispensable pour les <strong>VM critiques</strong> et les pets (vs cattle)</li>
+      </ul>
+      <h3 style="margin-top: 12px;">🔧 Variantes</h3>
+      <ul>
+        <li><strong>Pré-création</strong> du volume puis boot dessus</li>
+        <li>Création <strong>à la volée</strong> du volume depuis une image au moment du boot</li>
+        <li>Boot depuis un <strong>snapshot</strong> ou un <strong>volume existant</strong></li>
+      </ul>
+    </div>
+    <div>
+      <h3>💻 Boot from volume — 3 patterns</h3>
+      <pre class="code small"><span class="cm"># 1. Pré-créer le volume depuis une image</span>
+<span class="kw">openstack</span> volume create root-web-01 \
+  --image <span class="str">"Ubuntu 22.04"</span> --size <span class="num">40</span> \
+  --type ceph-ssd --bootable
+
+<span class="kw">openstack</span> server create web-01 \
+  --flavor m1.medium \
+  --network internal \
+  --volume root-web-01
+
+<span class="cm"># 2. Créer le volume au boot (one-shot)</span>
+<span class="kw">openstack</span> server create web-02 \
+  --flavor m1.medium --network internal \
+  --image <span class="str">"Ubuntu 22.04"</span> \
+  --boot-from-volume <span class="num">40</span>
+
+<span class="cm"># 3. Avec --block-device détaillé</span>
+<span class="kw">openstack</span> server create db-01 \
+  --flavor m1.large --network internal \
+  --block-device <span class="str">source_type=image,</span>\
+<span class="str">uuid=$IMG_ID,destination_type=volume,</span>\
+<span class="str">volume_size=80,boot_index=0,</span>\
+<span class="str">delete_on_termination=false</span></pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">39 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 40 — QUOTAS LIMITS ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">6. Types, QoS, snapshots</span>
+  <h1>Quotas Cinder par projet</h1>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>📊 Ressources quotables</h3>
+      <ul>
+        <li><strong>volumes</strong> : nombre total de volumes</li>
+        <li><strong>gigabytes</strong> : Go totaux sur tous backends</li>
+        <li><strong>snapshots</strong> : nombre de snapshots</li>
+        <li><strong>backups</strong> : nombre de backups</li>
+        <li><strong>backup_gigabytes</strong></li>
+        <li><strong>volumes_&lt;type&gt;</strong> et <strong>gigabytes_&lt;type&gt;</strong> : quotas <strong>par volume type</strong></li>
+        <li><strong>groups</strong> : groupes de volumes (consistency)</li>
+      </ul>
+      <div class="info-box warning">
+        <p>Les quotas par type permettent par exemple de limiter le SSD coûteux à 200 Go par projet tout en laissant le LVM HDD à 5 To.</p>
+      </div>
+    </div>
+    <div>
+      <h3>💻 Manipulation</h3>
+      <pre class="code small"><span class="cm"># Voir quotas</span>
+<span class="kw">openstack</span> quota show finance --usage
+
+<span class="cm"># Modifier</span>
+<span class="kw">openstack</span> quota set finance \
+  --volumes <span class="num">50</span> \
+  --gigabytes <span class="num">5000</span> \
+  --snapshots <span class="num">100</span> \
+  --backups <span class="num">20</span> \
+  --backup-gigabytes <span class="num">2000</span>
+
+<span class="cm"># Quotas par volume type</span>
+<span class="kw">openstack</span> quota set finance \
+  --volume-type premium \
+  --volumes <span class="num">10</span> \
+  --gigabytes <span class="num">200</span>
+
+<span class="cm"># Valeurs par défaut</span>
+<span class="kw">openstack</span> quota show --default
+
+<span class="cm"># Lister les volumes d'un projet</span>
+<span class="kw">openstack</span> volume list \
+  --project finance --long</pre>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">40 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 41 — TP PRESENTATION ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">Travaux pratiques</span>
+  <h1>TP : Gestion du stockage avec Cinder</h1>
+  <p class="subtitle">Mettre en pratique tout ce qu'on a vu sur Cinder, du backend au volume attaché</p>
+  <div class="grid-2" style="margin-top: 12px;">
+    <div>
+      <h3>🎯 Objectifs</h3>
+      <ul>
+        <li>Vérifier la configuration Cinder dans Kolla-Ansible</li>
+        <li>Créer deux volume types avec des QoS différents</li>
+        <li>Provisionner des volumes et les attacher à une VM</li>
+        <li>Formater, monter, écrire des données</li>
+        <li>Étendre un volume à chaud</li>
+        <li>Créer un snapshot et un clone</li>
+        <li>Effectuer un backup vers Swift, supprimer le volume, restaurer</li>
+        <li>Monter un volume <strong>multiattach</strong> sur deux VM</li>
+        <li>Tester le boot-from-volume</li>
+      </ul>
+    </div>
+    <div>
+      <h3>🏗️ Environnement</h3>
+      <ul>
+        <li>1 nœud control + 2 nœuds compute + 1 nœud storage</li>
+        <li>Cinder déployé avec <strong>2 backends</strong> : LVM + NFS (ou Ceph si lab étendu)</li>
+        <li>Swift déjà déployé pour les backups</li>
+        <li>1 VM Ubuntu prête (web-01)</li>
+        <li>Accès admin (openrc sourced)</li>
+      </ul>
+      <div class="info-box navy">
+        <p><span class="accent">⏱️ Durée :</span> 2 h 30<br/><span class="accent">📦 Livrables :</span> Captures CLI + Horizon, doc de procédure pour la prod</p>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">41 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 42 — TP ETAPES 1 ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">Travaux pratiques</span>
+  <h1>TP — Étapes 1 à 4</h1>
+  <pre class="code small" style="flex: 1; overflow: auto;"><span class="cm">################################################################
+# Étape 1 — Vérifier l'état de Cinder côté Kolla
+################################################################</span>
+<span class="kw">source</span> /etc/kolla/admin-openrc.sh
+
+<span class="kw">openstack</span> volume service list
+<span class="cm"># Doit montrer : cinder-scheduler, cinder-volume@lvm-1,
+#                cinder-volume@nfs-1, cinder-backup</span>
+
+<span class="kw">docker</span> ps --filter <span class="str">"name=cinder"</span>
+<span class="kw">openstack</span> endpoint list --service volumev3
+
+<span class="cm">################################################################
+# Étape 2 — Créer deux volume types
+################################################################</span>
+<span class="kw">openstack</span> volume type create gold-ssd
+<span class="kw">openstack</span> volume type set gold-ssd \
+  --property volume_backend_name=<span class="str">lvm-1</span>
+
+<span class="kw">openstack</span> volume type create bronze-nfs
+<span class="kw">openstack</span> volume type set bronze-nfs \
+  --property volume_backend_name=<span class="str">nfs-1</span>
+
+<span class="cm">################################################################
+# Étape 3 — QoS : limiter les IOPS du bronze
+################################################################</span>
+<span class="kw">openstack</span> volume qos create bronze-qos \
+  --consumer front-end \
+  --property total_iops_sec=<span class="num">500</span> \
+  --property total_bytes_sec=<span class="num">52428800</span>
+
+<span class="kw">openstack</span> volume qos associate bronze-qos bronze-nfs
+
+<span class="cm">################################################################
+# Étape 4 — Provisionner un volume et l'attacher
+################################################################</span>
+<span class="kw">openstack</span> volume create data-vol --size <span class="num">20</span> --type gold-ssd
+<span class="kw">openstack</span> volume show data-vol -c status -c volume_type
+
+<span class="kw">openstack</span> server add volume web-01 data-vol
+
+<span class="kw">ssh</span> ubuntu@&lt;FIP-web-01&gt; <span class="str">"
+  lsblk
+  sudo mkfs.xfs /dev/vdb
+  sudo mkdir /data && sudo mount /dev/vdb /data
+  sudo dd if=/dev/zero of=/data/test.bin bs=1M count=200
+"</span></pre>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">42 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 43 — TP ETAPES 2 ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">Travaux pratiques</span>
+  <h1>TP — Étapes 5 à 8</h1>
+  <pre class="code small" style="flex: 1; overflow: auto;"><span class="cm">################################################################
+# Étape 5 — Étendre un volume à chaud
+################################################################</span>
+<span class="kw">openstack</span> volume set --size <span class="num">50</span> data-vol
+<span class="kw">openstack</span> volume show data-vol -c size
+
+<span class="kw">ssh</span> ubuntu@&lt;FIP&gt; <span class="str">"
+  sudo xfs_growfs /data
+  df -h /data    # 50G attendu
+"</span>
+
+<span class="cm">################################################################
+# Étape 6 — Snapshot et clone
+################################################################</span>
+<span class="kw">openstack</span> volume snapshot create \
+  --volume data-vol data-vol-snap-1
+
+<span class="kw">openstack</span> volume create data-vol-clone \
+  --snapshot data-vol-snap-1 --size <span class="num">50</span>
+
+<span class="kw">openstack</span> server add volume web-02 data-vol-clone
+
+<span class="cm">################################################################
+# Étape 7 — Backup vers Swift, suppression, restauration
+################################################################</span>
+<span class="kw">openstack</span> volume backup create \
+  --name data-vol-bk-full data-vol
+
+<span class="kw">openstack</span> volume backup list
+
+<span class="cm"># Simuler une perte : détacher + supprimer le volume</span>
+<span class="kw">openstack</span> server remove volume web-01 data-vol
+<span class="kw">openstack</span> volume delete data-vol
+
+<span class="cm"># Restaurer dans un nouveau volume</span>
+<span class="kw">openstack</span> volume backup restore \
+  data-vol-bk-full data-vol-restored
+
+<span class="kw">openstack</span> server add volume web-01 data-vol-restored
+
+<span class="cm">################################################################
+# Étape 8 — Boot-from-volume + multiattach
+################################################################</span>
+<span class="kw">openstack</span> volume create shared --size <span class="num">10</span> \
+  --type gold-ssd --multiattach
+<span class="kw">openstack</span> server add volume web-01 shared
+<span class="kw">openstack</span> server add volume web-02 shared
+
+<span class="kw">openstack</span> server create db-01 \
+  --flavor m1.medium --network internal \
+  --image <span class="str">"Ubuntu 22.04"</span> --boot-from-volume <span class="num">40</span></pre>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">43 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 44 — MANILA ASIDE ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">Pour aller plus loin</span>
+  <h1>Manila — File Share Service (aparté)</h1>
+  <p class="subtitle">Le troisième pilier du stockage OpenStack, complémentaire de Swift et Cinder</p>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div>
+      <h3>📂 Qu'est-ce que Manila ?</h3>
+      <ul>
+        <li>Provisionne des <strong>partages de fichiers</strong> accessibles via NFS, CIFS, CephFS</li>
+        <li>Plusieurs VM peuvent <strong>monter le même share</strong> simultanément</li>
+        <li>Quotas, snapshots et ACL au niveau du share</li>
+        <li>Drivers : <strong>CephFS</strong>, <strong>NetApp</strong>, <strong>GlusterFS</strong>, <strong>Generic</strong> (utilise une VM "service")</li>
+        <li>Activable via Kolla : <code>enable_manila: "yes"</code> + <code>enable_manila_backend_cephfs_native: "yes"</code></li>
+      </ul>
+    </div>
+    <div>
+      <h3>🎯 Cas d'usage</h3>
+      <ul>
+        <li><strong>Home dirs</strong> partagés pour postes de travail virtualisés</li>
+        <li><strong>Web cluster</strong> avec assets partagés (uploads, médias)</li>
+        <li><strong>Backups</strong> mutualisés</li>
+        <li><strong>Apps legacy</strong> requérant un montage NFS</li>
+        <li><strong>CI/CD</strong> : cache partagé entre runners</li>
+      </ul>
+      <pre class="code small" style="margin-top: 8px;"><span class="cm"># Aperçu CLI</span>
+<span class="kw">openstack</span> share type create default <span class="kw">false</span>
+<span class="kw">openstack</span> share create NFS <span class="num">100</span> --name web-assets
+<span class="kw">openstack</span> share access create web-assets \
+  ip <span class="num">10.0.0.0/24</span>
+<span class="kw">openstack</span> share show web-assets</pre>
+    </div>
+  </div>
+  <div class="info-box">
+    <p>Manila est <strong>hors du périmètre de ce module</strong>, mais c'est l'option à connaître quand un cas d'usage demande "plusieurs VM doivent voir le même filesystem".</p>
+  </div>
+  <div class="brand-tag">Utopios — Module 3</div>
+  <div class="slide-number">44 / 45</div>
+</div>
+
+<!-- ============================ SLIDE 45 — RECAP ============================ -->
+<div class="slide">
+  <div class="brand-bar"></div>
+  <span class="module-tag">Récapitulatif</span>
+  <h1>Ce que vous avez appris</h1>
+  <div class="grid-2" style="margin-top: 12px;">
+    <div>
+      <div class="card cyan" style="margin-bottom: 10px;">
+        <h4><span class="num cyan">1</span>Modèles de stockage</h4>
+        <p style="font-size: 12px; margin-left: 36px;">Object (Swift), block (Cinder), fichier (Manila) — savoir choisir selon le cas d'usage</p>
+      </div>
+      <div class="card" style="margin-bottom: 10px;">
+        <h4><span class="num">2</span>Swift : architecture</h4>
+        <p style="font-size: 12px; margin-left: 36px;">Proxy + account/container/object servers, ring, hashing cohérent, réplication, eventual consistency</p>
+      </div>
+      <div class="card navy" style="margin-bottom: 10px;">
+        <h4><span class="num navy">3</span>Swift via Kolla</h4>
+        <p style="font-size: 12px; margin-left: 36px;">globals.yml, génération des rings, zones/regions, storage policies, opérations admin</p>
+      </div>
+      <div class="card orange" style="margin-bottom: 10px;">
+        <h4><span class="num" style="background: var(--orange);">4</span>Cinder : architecture</h4>
+        <p style="font-size: 12px; margin-left: 36px;">api + scheduler + volume + backup, cycle de vie des volumes, structure Kolla</p>
+      </div>
+    </div>
+    <div>
+      <div class="card purple" style="margin-bottom: 10px;">
+        <h4><span class="num" style="background: var(--purple);">5</span>Backends Cinder</h4>
+        <p style="font-size: 12px; margin-left: 36px;">LVM, Ceph RBD, NFS, NetApp, multi-backend ; volume types pour aiguiller</p>
+      </div>
+      <div class="card green" style="margin-bottom: 10px;">
+        <h4><span class="num" style="background: var(--green);">6</span>Exploitation au quotidien</h4>
+        <p style="font-size: 12px; margin-left: 36px;">QoS, snapshots, backups vers Swift, multiattach, boot-from-volume, quotas par type</p>
+      </div>
+      <h3 style="margin-top: 14px;">➡️ Prochain module</h3>
+      <div style="background: linear-gradient(135deg, var(--blue), var(--cyan)); color: var(--white); padding: 14px 18px; border-radius: 10px;">
+        <span style="font-size: 10px; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px;">Module 4 / 7</span>
+        <h4 style="color: var(--white); margin-top: 4px; margin-bottom: 4px; font-size: 16px;">Gestion des images</h4>
+        <p style="font-size: 12px; margin: 0; color: rgba(255,255,255,0.95);">Glance : stores, formats, cloud-init, golden images, building avec diskimage-builder.</p>
+      </div>
+    </div>
+  </div>
+  <div class="brand-tag">Utopios — Module 3 — Fin</div>
+  <div class="slide-number">45 / 45</div>
+</div>
+
+</div>
+
+<div class="controls" id="controls">
+  <button class="ctrl-btn" id="btnFirst" title="Première (Home)">⏮</button>
+  <button class="ctrl-btn" id="btnPrev" title="Précédent (←)">←</button>
+  <div class="ctrl-counter">
+    <input type="number" id="slideInput" min="1" value="1"> / <span id="totalSlides">45</span>
+  </div>
+  <button class="ctrl-btn" id="btnNext" title="Suivant (→ ou Espace)">→</button>
+  <button class="ctrl-btn" id="btnLast" title="Dernière (End)">⏭</button>
+  <button class="ctrl-btn" id="btnOverview" title="Vue d'ensemble (O)">▦</button>
+  <button class="ctrl-btn" id="btnFullscreen" title="Plein écran (F)">⛶</button>
+</div>
+
+<script>
+(function() {
+  const deck = document.getElementById('deck');
+  const slides = Array.from(deck.querySelectorAll('.slide'));
+  const total = slides.length;
+  const progress = document.getElementById('progress');
+  const slideInput = document.getElementById('slideInput');
+  const totalSpan = document.getElementById('totalSlides');
+  const hint = document.getElementById('hint');
+
+  totalSpan.textContent = total;
+  slideInput.max = total;
+
+  let current = 0;
+  let overview = false;
+
+  function indexFromHash() {
+    const m = location.hash.match(/^#\/(\d+)$/);
+    if (m) {
+      const i = parseInt(m[1], 10) - 1;
+      if (i >= 0 && i < total) return i;
+    }
+    return 0;
+  }
+
+  function render() {
+    slides.forEach((s, i) => s.classList.toggle('active', i === current));
+    progress.style.width = ((current + 1) / total * 100) + '%';
+    slideInput.value = current + 1;
+    document.getElementById('btnPrev').disabled = current === 0;
+    document.getElementById('btnFirst').disabled = current === 0;
+    document.getElementById('btnNext').disabled = current === total - 1;
+    document.getElementById('btnLast').disabled = current === total - 1;
+    location.hash = '#/' + (current + 1);
+  }
+
+  function goto(i) {
+    if (i < 0) i = 0;
+    if (i >= total) i = total - 1;
+    current = i;
+    render();
+  }
+  function next() { goto(current + 1); }
+  function prev() { goto(current - 1); }
+
+  function toggleOverview() {
+    overview = !overview;
+    deck.classList.toggle('overview', overview);
+    if (overview) {
+      slides.forEach((s, i) => {
+        s.onclick = () => {
+          overview = false;
+          deck.classList.remove('overview');
+          slides.forEach(sl => sl.onclick = null);
+          goto(i);
+          window.scrollTo(0, 0);
+        };
+      });
+    } else {
+      slides.forEach(s => s.onclick = null);
+      window.scrollTo(0, 0);
+    }
+  }
+
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.();
+    } else {
+      document.exitFullscreen?.();
+    }
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+    switch (e.key) {
+      case 'ArrowRight':
+      case 'PageDown':
+      case ' ':
+        e.preventDefault(); next(); break;
+      case 'ArrowLeft':
+      case 'PageUp':
+        e.preventDefault(); prev(); break;
+      case 'Home':
+        e.preventDefault(); goto(0); break;
+      case 'End':
+        e.preventDefault(); goto(total - 1); break;
+      case 'f':
+      case 'F':
+        e.preventDefault(); toggleFullscreen(); break;
+      case 'o':
+      case 'O':
+        e.preventDefault(); toggleOverview(); break;
+      case 'Escape':
+        if (overview) { e.preventDefault(); toggleOverview(); }
+        break;
+    }
+  });
+
+  deck.addEventListener('click', (e) => {
+    if (overview) return;
+    if (e.target.closest('.controls') || e.target.closest('a') || e.target.closest('button') || e.target.closest('input')) return;
+    const rect = deck.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    if (x < rect.width * 0.3) prev();
+    else next();
+  });
+
+  let touchStartX = 0;
+  deck.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+  }, { passive: true });
+  deck.addEventListener('touchend', (e) => {
+    if (overview) return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 50) {
+      if (dx < 0) next(); else prev();
+    }
+  }, { passive: true });
+
+  document.getElementById('btnPrev').addEventListener('click', prev);
+  document.getElementById('btnNext').addEventListener('click', next);
+  document.getElementById('btnFirst').addEventListener('click', () => goto(0));
+  document.getElementById('btnLast').addEventListener('click', () => goto(total - 1));
+  document.getElementById('btnOverview').addEventListener('click', toggleOverview);
+  document.getElementById('btnFullscreen').addEventListener('click', toggleFullscreen);
+
+  slideInput.addEventListener('change', () => {
+    goto(parseInt(slideInput.value, 10) - 1);
+  });
+  slideInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') slideInput.blur();
+  });
+
+  window.addEventListener('hashchange', () => {
+    const i = indexFromHash();
+    if (i !== current) goto(i);
+  });
+
+  current = indexFromHash();
+  render();
+
+  hint.classList.add('show');
+  setTimeout(() => hint.classList.remove('show'), 4000);
+})();
+</script>
+</body>
+</html>

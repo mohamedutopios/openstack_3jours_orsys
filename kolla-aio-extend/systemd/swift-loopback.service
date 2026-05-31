@@ -1,0 +1,23 @@
+[Unit]
+Description=Reattach loopback devices and mount Swift disks
+DefaultDependencies=no
+After=local-fs.target
+Before=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c '\
+  for i in 0 1 2; do \
+    /sbin/losetup /dev/loop$((20+i)) /srv/swift-disk-${i}.img; \
+    /bin/mkdir -p /srv/node/d${i}; \
+    /bin/mount -o noatime /dev/loop$((20+i)) /srv/node/d${i}; \
+  done'
+ExecStop=/bin/bash -c '\
+  for i in 0 1 2; do \
+    /bin/umount /srv/node/d${i} || true; \
+    /sbin/losetup -d /dev/loop$((20+i)) || true; \
+  done'
+
+[Install]
+WantedBy=multi-user.target

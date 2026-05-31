@@ -1,0 +1,106 @@
+; Inventaire Kolla-Ansible — 3 nodes collapsés sur EC2.
+; Adapter les IPs si différentes du subnet 10.0.1.0/24.
+
+[control]
+node1 ansible_host=10.0.1.11
+node2 ansible_host=10.0.1.12
+node3 ansible_host=10.0.1.13
+
+[network:children]
+control
+
+[compute]
+node1 ansible_host=10.0.1.11
+node2 ansible_host=10.0.1.12
+node3 ansible_host=10.0.1.13
+
+[storage:children]
+control
+
+[monitoring:children]
+control
+
+[deployment]
+localhost ansible_connection=local
+
+; ---------- Sous-groupes hérités (laisser tel quel) ----------
+[loadbalancer:children]
+network
+
+[common:children]
+control
+network
+compute
+storage
+monitoring
+
+[mariadb:children]
+control
+
+[rabbitmq:children]
+control
+
+[outward-rabbitmq:children]
+control
+
+[memcached:children]
+control
+
+[redis:children]
+control
+
+[etcd:children]
+control
+
+[keystone:children]
+control
+
+[glance:children]
+control
+
+[nova:children]
+control
+
+[nova-compute:children]
+compute
+
+[neutron:children]
+network
+
+[neutron-compute:children]
+compute
+
+[cinder:children]
+control
+
+[cinder-volume:children]
+storage
+
+[swift:children]
+control
+
+[swift-account-server:children]
+storage
+
+[swift-container-server:children]
+storage
+
+[swift-object-server:children]
+storage
+
+[swift-proxy-server:children]
+control
+
+[heat:children]
+control
+
+[barbican:children]
+control
+
+[horizon:children]
+control
+
+[nodes:vars]
+ansible_user=ubuntu
+ansible_python_interpreter=/usr/bin/python3
+ansible_become=true
